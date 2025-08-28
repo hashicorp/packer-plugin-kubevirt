@@ -1,0 +1,23 @@
+apiVersion: cdi.kubevirt.io/v1beta1
+kind: DataVolume
+metadata:
+  name: rhel-10-x86-64-iso
+  annotations:
+    cdi.kubevirt.io/storage.bind.immediate.requested: "true"
+spec:
+  source:
+    http:
+      #
+      # Set the required URL, or upload it via "virtctl image-upload" to the Kubernetes cluster.
+      #
+      # For Example:
+      #
+      # $ virtctl image-upload dv rhel-10-x86-64-iso --size=10Gi --image-path=./rhel-10.0-x86_64-dvd.iso --force-bind --insecure
+      #
+      url: "<URL>"
+  pvc:
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: 10Gi
