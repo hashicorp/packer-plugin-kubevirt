@@ -65,8 +65,9 @@ type MultusNetwork struct {
 type Config struct {
 	common.PackerConfig `mapstructure:",squash"`
 
-	Comm         communicator.Config `mapstructure:",squash"`
-	WaitIpConfig `mapstructure:",squash"`
+	Comm              communicator.Config `mapstructure:",squash"`
+	WaitIpConfig      `mapstructure:",squash"`
+	PortForwardConfig `mapstructure:",squash"`
 
 	// KubeConfig is the path to the kubeconfig file.
 	KubeConfig string `mapstructure:"kube_config" required:"true"`
@@ -152,6 +153,16 @@ func (c *Config) Prepare(raws ...interface{}) ([]string, error) {
 		if n.Pod != nil && n.Multus != nil {
 			errs = packersdk.MultiErrorAppend(errs, fmt.Errorf("network %q: only one of pod or multus can be defined", n.Name))
 		}
+		if n.Pod != nil && c.Comm.Host() == "" && c.DisableForwarding {
+			warnings = append(warnings, "Direct connections (direct_connect=true) likely will not work when using a pod network")
+		}
+	}
+
+	// Also check for no networks, which defaults to using the pod network:
+	if len(c.Networks) == 0 {
+		if c.Comm.Host() == "" && c.DisableForwarding {
+			warnings = append(warnings, "Direct connections (direct_connect=true) likely will not work when using a pod network")
+		}
 	}
 
 	if len(errs.Errors) > 0 {
@@ -175,5 +186,16 @@ func (c *Config) backwardsCompat() {
 
 	if c.WinRMWaitTimeout != 0 {
 		c.Comm.WinRMTimeout = c.WinRMWaitTimeout
+	}
+
+	switch c.Comm.Type {
+	case "ssh":
+		if c.SSHLocalPort > 0 {
+			c.PortForwardConfig.ForwardingPort = c.SSHLocalPort
+		}
+	case "winrm":
+		if c.WinRMLocalPort > 0 {
+			c.PortForwardConfig.ForwardingPort = c.WinRMLocalPort
+		}
 	}
 }
