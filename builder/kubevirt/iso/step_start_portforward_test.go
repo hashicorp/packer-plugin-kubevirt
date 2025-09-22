@@ -16,6 +16,7 @@ import (
 
 	"github.com/hashicorp/packer-plugin-kubevirt/builder/kubevirt/common"
 	"github.com/hashicorp/packer-plugin-kubevirt/builder/kubevirt/iso"
+	"github.com/hashicorp/packer-plugin-sdk/communicator"
 	"github.com/hashicorp/packer-plugin-sdk/multistep"
 	"github.com/hashicorp/packer-plugin-sdk/packer"
 
@@ -77,10 +78,14 @@ var _ = Describe("StepStartPortForward", func() {
 		mockFwd = &mockPortForwarder{}
 		step = &iso.StepStartPortForward{
 			Config: iso.Config{
-				Name:          name,
-				Namespace:     namespace,
-				Communicator:  "ssh",
-				SSHHost:       "127.0.0.1",
+				Name:      name,
+				Namespace: namespace,
+				Comm: communicator.Config{
+					Type: "ssh",
+					SSH: communicator.SSH{
+						SSHHost: "127.0.0.1",
+					},
+				},
 				SSHLocalPort:  2222,
 				SSHRemotePort: 22,
 			},
@@ -117,8 +122,12 @@ var _ = Describe("StepStartPortForward", func() {
 		})
 
 		It("works with WinRM configuration", func() {
-			step.Config.Communicator = "winrm"
-			step.Config.WinRMHost = "127.0.0.1"
+			step.Config.Comm = communicator.Config{
+				Type: "winrm",
+				WinRM: communicator.WinRM{
+					WinRMHost: "127.0.0.1",
+				},
+			}
 			step.Config.WinRMLocalPort = 5985
 			step.Config.WinRMRemotePort = 5985
 

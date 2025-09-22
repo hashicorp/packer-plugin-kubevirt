@@ -11,7 +11,10 @@ import (
 	"time"
 
 	"github.com/hashicorp/packer-plugin-sdk/common"
+	"github.com/hashicorp/packer-plugin-sdk/communicator"
+	packersdk "github.com/hashicorp/packer-plugin-sdk/packer"
 	"github.com/hashicorp/packer-plugin-sdk/template/config"
+	"github.com/hashicorp/packer-plugin-sdk/template/interpolate"
 )
 
 // Network represents a network type and a resource that should be connected to the VM.
@@ -62,6 +65,8 @@ type MultusNetwork struct {
 type Config struct {
 	common.PackerConfig `mapstructure:",squash"`
 
+	Comm communicator.Config `mapstructure:",squash"`
+
 	// KubeConfig is the path to the kubeconfig file.
 	KubeConfig string `mapstructure:"kube_config" required:"true"`
 	// Name is the name of the VM image.
@@ -99,33 +104,19 @@ type Config struct {
 	BootWait time.Duration `mapstructure:"boot_wait" required:"false"`
 	// InstallationWaitTimeout is the amount of time to wait for the installation to be completed.
 	InstallationWaitTimeout time.Duration `mapstructure:"installation_wait_timeout" required:"true"`
-	// Communicator is the type of communicator to use to connect to the VM.
-	// Supported values are "ssh" and "winrm".
-	Communicator string `mapstructure:"communicator" required:"false"`
-	// SSHHost is the hostname or IP address to use to connect via SSH.
-	SSHHost string `mapstructure:"ssh_host" required:"false"`
 	// SSHLocalPort is the local port to use to connect via SSH.
 	SSHLocalPort int `mapstructure:"ssh_local_port" required:"false"`
 	// SSHRemotePort is the remote port to use to connect via SSH.
-	SSHRemotePort int `mapstructure:"ssh_remote_port" required:"false"`
-	// SSHUsername is the username to use to connect via SSH.
-	SSHUsername string `mapstructure:"ssh_username" required:"false"`
-	// SSHPassword is the password to use to connect via SSH.
-	SSHPassword string `mapstructure:"ssh_password" required:"false"`
-	// SSHWaitTimeout is the amount of time to wait for the SSH service to be available.
-	SSHWaitTimeout time.Duration `mapstructure:"ssh_wait_timeout" required:"false"`
-	// WinRMHost is the hostname or IP address to use to connect via WinRM.
-	WinRMHost string `mapstructure:"winrm_host" required:"false"`
+	// This has been deprecated in favor of ssh_port.
+	SSHRemotePort int `mapstructure:"ssh_remote_port" required:"false" undocumented:"true"`
 	// WinRMLocalPort is the local port to use to connect via WinRM.
 	WinRMLocalPort int `mapstructure:"winrm_local_port" required:"false"`
 	// WinRMRemotePort is the remote port to use to connect via WinRM.
-	WinRMRemotePort int `mapstructure:"winrm_remote_port" required:"false"`
-	// WinRMUsername is the username to use to connect via WinRM.
-	WinRMUsername string `mapstructure:"winrm_username" required:"false"`
-	// WinRMPassword is the password to use to connect via WinRM.
-	WinRMPassword string `mapstructure:"winrm_password" required:"false"`
+	// This has been deprecated in favor of WinRMPort
+	WinRMRemotePort int `mapstructure:"winrm_remote_port" required:"false" undocumented:"true"`
 	// WinRMWaitTimeout is the amount of time to wait for the WinRM service to be available.
-	WinRMWaitTimeout time.Duration `mapstructure:"winrm_wait_timeout" required:"false"`
+	// This has been deprecated in favor of WinRMTimeout
+	WinRMWaitTimeout time.Duration `mapstructure:"winrm_wait_timeout" required:"false" undocumented:"true"`
 
 	// KeepVM indicates whether to keep the temporary VM after the image has been created.
 	// If false, the VM and all its resources will be deleted after the image is created.
@@ -136,21 +127,58 @@ type Config struct {
 	// However, it is recommended to set this to false in production environments to avoid
 	// resource leaks.
 	KeepVM bool `mapstructure:"keep_vm" required:"false"`
+
+	ctx interpolate.Context
 }
 
 func (c *Config) Prepare(raws ...interface{}) ([]string, error) {
 	err := config.Decode(c, &config.DecodeOpts{
-		PluginType:  "builder.kubevirt.iso",
-		Interpolate: true,
+		PluginType:         "builder.kubevirt.iso",
+		Interpolate:        true,
+		InterpolateContext: &c.ctx,
 	}, raws...)
 	if err != nil {
 		return nil, err
 	}
 
+	warnings := make([]string, 0)
+	errs := new(packersdk.MultiError)
+
+	errs = packersdk.MultiErrorAppend(errs, c.Comm.Prepare(&c.ctx)...)
+
 	for _, n := range c.Networks {
 		if n.Pod != nil && n.Multus != nil {
-			return nil, fmt.Errorf("network %q: only one of pod or multus can be defined", n.Name)
+			errs = packersdk.MultiErrorAppend(errs, fmt.Errorf("network %q: only one of pod or multus can be defined", n.Name))
 		}
 	}
-	return nil, err
+
+	if len(errs.Errors) > 0 {
+		return warnings, errs
+	}
+
+	// Remap deprecated values for backwards compatibility:
+	warnings = append(warnings, c.backwardsCompat()...)
+
+	return warnings, nil
+}
+
+func (c *Config) backwardsCompat() []string {
+	depmsg := make([]string, 0)
+
+	if c.SSHRemotePort != 0 {
+		depmsg = append(depmsg, "ssh_remote_port is deprecated - use ssh_port instead")
+		c.Comm.SSHPort = c.SSHRemotePort
+	}
+
+	if c.WinRMRemotePort != 0 {
+		depmsg = append(depmsg, "winrm_remote_port is deprecated - use winrm_port instead")
+		c.Comm.WinRMPort = c.WinRMRemotePort
+	}
+
+	if c.WinRMWaitTimeout != 0 {
+		depmsg = append(depmsg, "winrm_wait_timeout is deprecated - use winrm_timeout instead")
+		c.Comm.WinRMTimeout = c.WinRMWaitTimeout
+	}
+
+	return depmsg
 }
