@@ -35,16 +35,16 @@ func (s *StepStartPortForward) Run(ctx context.Context, state multistep.StateBag
 	name := s.Config.Name
 	namespace := s.Config.Namespace
 
-	if s.Config.Communicator == "ssh" {
-		ipAddress = s.Config.SSHHost
+	if s.Config.Comm.Type == "ssh" {
+		ipAddress = s.Config.Comm.SSHHost
 		localPort = s.Config.SSHLocalPort
-		remotePort = s.Config.SSHRemotePort
+		remotePort = s.Config.Comm.SSHPort
 	}
 
-	if s.Config.Communicator == "winrm" {
-		ipAddress = s.Config.WinRMHost
+	if s.Config.Comm.Type == "winrm" {
+		ipAddress = s.Config.Comm.WinRMHost
 		localPort = s.Config.WinRMLocalPort
-		remotePort = s.Config.WinRMRemotePort
+		remotePort = s.Config.Comm.WinRMPort
 	}
 
 	address, _ := net.ResolveIPAddr("", ipAddress)

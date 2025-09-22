@@ -87,7 +87,7 @@ func (b *Builder) Run(ctx context.Context, ui packer.Ui, hook packer.Hook) (pack
 		},
 	)
 
-	if b.config.Communicator == "ssh" {
+	if b.config.Comm.Type == "ssh" {
 		sshSteps, err := b.buildSSHSteps()
 		if err != nil {
 			ui.Errorf("SSH communicator config error: %v", err)
@@ -96,7 +96,7 @@ func (b *Builder) Run(ctx context.Context, ui packer.Ui, hook packer.Hook) (pack
 		steps = append(steps, sshSteps...)
 	}
 
-	if b.config.Communicator == "winrm" {
+	if b.config.Comm.Type == "winrm" {
 		winRMSteps, err := b.buildWinRMSteps()
 		if err != nil {
 			ui.Errorf("WinRM communicator config error: %v", err)
@@ -132,13 +132,13 @@ func (b *Builder) Run(ctx context.Context, ui packer.Ui, hook packer.Hook) (pack
 
 func (b *Builder) buildSSHSteps() ([]multistep.Step, []error) {
 	commConfig := &communicator.Config{
-		Type: b.config.Communicator,
+		Type: b.config.Comm.Type,
 		SSH: communicator.SSH{
-			SSHHost:     b.config.SSHHost,
+			SSHHost:     b.config.Comm.SSHHost,
 			SSHPort:     b.config.SSHLocalPort,
-			SSHUsername: b.config.SSHUsername,
-			SSHPassword: b.config.SSHPassword,
-			SSHTimeout:  b.config.SSHWaitTimeout,
+			SSHUsername: b.config.Comm.SSHUsername,
+			SSHPassword: b.config.Comm.SSHPassword,
+			SSHTimeout:  b.config.Comm.SSHTimeout,
 		},
 	}
 
@@ -159,9 +159,9 @@ func (b *Builder) buildSSHSteps() ([]multistep.Step, []error) {
 			},
 			SSHConfig: func(state multistep.StateBag) (*ssh.ClientConfig, error) {
 				return &ssh.ClientConfig{
-					User: b.config.SSHUsername,
+					User: b.config.Comm.SSHUsername,
 					Auth: []ssh.AuthMethod{
-						ssh.Password(b.config.SSHPassword),
+						ssh.Password(b.config.Comm.SSHPassword),
 					},
 					HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 				}, nil
@@ -177,13 +177,13 @@ func (b *Builder) buildSSHSteps() ([]multistep.Step, []error) {
 
 func (b *Builder) buildWinRMSteps() ([]multistep.Step, []error) {
 	commConfig := &communicator.Config{
-		Type: b.config.Communicator,
+		Type: b.config.Comm.Type,
 		WinRM: communicator.WinRM{
-			WinRMHost:     b.config.WinRMHost,
+			WinRMHost:     b.config.Comm.WinRMHost,
 			WinRMPort:     b.config.WinRMLocalPort,
-			WinRMUser:     b.config.WinRMUsername,
-			WinRMPassword: b.config.WinRMPassword,
-			WinRMTimeout:  b.config.WinRMWaitTimeout,
+			WinRMUser:     b.config.Comm.WinRMUser,
+			WinRMPassword: b.config.Comm.WinRMPassword,
+			WinRMTimeout:  b.config.Comm.WinRMTimeout,
 		},
 	}
 
@@ -204,8 +204,8 @@ func (b *Builder) buildWinRMSteps() ([]multistep.Step, []error) {
 			},
 			WinRMConfig: func(state multistep.StateBag) (*communicator.WinRMConfig, error) {
 				return &communicator.WinRMConfig{
-					Username: b.config.WinRMUsername,
-					Password: b.config.WinRMPassword,
+					Username: b.config.Comm.WinRMUser,
+					Password: b.config.Comm.WinRMPassword,
 				}, nil
 			},
 			WinRMPort: func(state multistep.StateBag) (int, error) {

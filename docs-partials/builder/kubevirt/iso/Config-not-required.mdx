@@ -20,32 +20,9 @@
 - `boot_wait` (duration string | ex: "1h5m2s") - BootWait is the amount of time to wait before sending the boot command.
   This is useful if the VM takes some time to boot and be ready to accept keystrokes.
 
-- `communicator` (string) - Communicator is the type of communicator to use to connect to the VM.
-  Supported values are "ssh" and "winrm".
-
-- `ssh_host` (string) - SSHHost is the hostname or IP address to use to connect via SSH.
-
 - `ssh_local_port` (int) - SSHLocalPort is the local port to use to connect via SSH.
 
-- `ssh_remote_port` (int) - SSHRemotePort is the remote port to use to connect via SSH.
-
-- `ssh_username` (string) - SSHUsername is the username to use to connect via SSH.
-
-- `ssh_password` (string) - SSHPassword is the password to use to connect via SSH.
-
-- `ssh_wait_timeout` (duration string | ex: "1h5m2s") - SSHWaitTimeout is the amount of time to wait for the SSH service to be available.
-
-- `winrm_host` (string) - WinRMHost is the hostname or IP address to use to connect via WinRM.
-
 - `winrm_local_port` (int) - WinRMLocalPort is the local port to use to connect via WinRM.
-
-- `winrm_remote_port` (int) - WinRMRemotePort is the remote port to use to connect via WinRM.
-
-- `winrm_username` (string) - WinRMUsername is the username to use to connect via WinRM.
-
-- `winrm_password` (string) - WinRMPassword is the password to use to connect via WinRM.
-
-- `winrm_wait_timeout` (duration string | ex: "1h5m2s") - WinRMWaitTimeout is the amount of time to wait for the WinRM service to be available.
 
 - `keep_vm` (bool) - KeepVM indicates whether to keep the temporary VM after the image has been created.
   If false, the VM and all its resources will be deleted after the image is created.
