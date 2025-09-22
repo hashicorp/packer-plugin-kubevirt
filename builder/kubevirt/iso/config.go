@@ -65,9 +65,10 @@ type MultusNetwork struct {
 type Config struct {
 	common.PackerConfig `mapstructure:",squash"`
 
-	Comm              communicator.Config `mapstructure:",squash"`
-	WaitIpConfig      `mapstructure:",squash"`
-	PortForwardConfig `mapstructure:",squash"`
+	Comm               communicator.Config `mapstructure:",squash"`
+	WaitIpConfig       `mapstructure:",squash"`
+	PortForwardConfig  `mapstructure:",squash"`
+	WaitForAgentConfig `mapstructure:",squash"`
 
 	// KubeConfig is the path to the kubeconfig file.
 	KubeConfig string `mapstructure:"kube_config" required:"true"`

@@ -85,6 +85,10 @@ func (b *Builder) Run(ctx context.Context, ui packer.Ui, hook packer.Hook) (pack
 			config: b.config,
 			client: b.client,
 		},
+		&StepWaitForAgent{
+			Config: b.config,
+			Client: b.client,
+		},
 		&StepWaitForInstallation{
 			Config: b.config,
 		},
