@@ -35,17 +35,19 @@ func (s *StepStartPortForward) Run(ctx context.Context, state multistep.StateBag
 	name := s.Config.Name
 	namespace := s.Config.Namespace
 
-	if s.Config.Comm.Type == "ssh" {
-		ipAddress = s.Config.Comm.SSHHost
+	switch s.Config.Comm.Type {
+	case "none":
+		ui.Sayf("communicator type 'none', skipping port forwarding setup")
+		return multistep.ActionContinue
+	case "ssh":
 		localPort = s.Config.SSHLocalPort
-		remotePort = s.Config.Comm.SSHPort
-	}
-
-	if s.Config.Comm.Type == "winrm" {
-		ipAddress = s.Config.Comm.WinRMHost
+	case "winrm":
 		localPort = s.Config.WinRMLocalPort
-		remotePort = s.Config.Comm.WinRMPort
 	}
+	state.Put("forwarding_port", localPort)
+
+	ipAddress = s.Config.Comm.Host()
+	remotePort = s.Config.Comm.Port()
 
 	address, _ := net.ResolveIPAddr("", ipAddress)
 	vm := s.Client.VirtualMachine(namespace)
