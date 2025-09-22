@@ -65,7 +65,8 @@ type MultusNetwork struct {
 type Config struct {
 	common.PackerConfig `mapstructure:",squash"`
 
-	Comm communicator.Config `mapstructure:",squash"`
+	Comm         communicator.Config `mapstructure:",squash"`
+	WaitIpConfig `mapstructure:",squash"`
 
 	// KubeConfig is the path to the kubeconfig file.
 	KubeConfig string `mapstructure:"kube_config" required:"true"`
@@ -144,6 +145,7 @@ func (c *Config) Prepare(raws ...interface{}) ([]string, error) {
 	warnings := make([]string, 0)
 	errs := new(packersdk.MultiError)
 
+	errs = packersdk.MultiErrorAppend(errs, c.WaitIpConfig.Prepare()...)
 	errs = packersdk.MultiErrorAppend(errs, c.Comm.Prepare(&c.ctx)...)
 
 	for _, n := range c.Networks {
