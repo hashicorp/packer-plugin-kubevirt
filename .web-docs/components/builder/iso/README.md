@@ -174,6 +174,18 @@ Source: https://kubevirt.io/api-reference/v1.6.0/definitions.html#_v1_multusnetw
 
 **Optional**:
 
+<!-- Code generated from the comments of the WaitForAgentConfig struct in builder/kubevirt/iso/step_wait_for_agent.go; DO NOT EDIT MANUALLY -->
+
+- `agent_wait_timeout` (duration string | ex: "1h5m2s") - AgentWaitTimeout is the amount of time to wait for the QEMU Guest Agent to be
+  available.
+  If the Guest Agent does not become available before the timeout, the installation
+  will be cancelled. When set to `0s`, waiting for the guest agent to be available
+  is skipped. Defaults to `0s` (do not wait for the QEMU Guest Agent).
+  Refer to the Golang [ParseDuration](https://golang.org/pkg/time/#ParseDuration)
+  documentation for full details.
+
+<!-- End of code generated from the comments of the WaitForAgentConfig struct in builder/kubevirt/iso/step_wait_for_agent.go; -->
+
 <!-- Code generated from the comments of the WaitIpConfig struct in builder/kubevirt/iso/step_wait_for_ip.go; DO NOT EDIT MANUALLY -->
 
 - `ip_wait_timeout` (duration string | ex: "1h5m2s") - Amount of time to wait for VM's IP, similar to 'ssh_timeout'.
