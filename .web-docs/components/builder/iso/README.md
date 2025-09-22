@@ -197,6 +197,17 @@ Source: https://kubevirt.io/api-reference/v1.6.0/definitions.html#_v1_multusnetw
 
 ##### Common
 
+<!-- Code generated from the comments of the PortForwardConfig struct in builder/kubevirt/iso/step_start_portforward.go; DO NOT EDIT MANUALLY -->
+
+- `disable_forwarding` (bool) - If true, disable the built-in port forwarding via Kubernetes control-plane.
+  By default, the Kubernetes control-plane forwarding is used.
+
+- `forwarding_port` (int) - ForwardingPort is the local port used for port-forwarding to the VM for the
+  appropriate communicator. If this is not set, or set to 0, then a local ephemeral
+  port will be allocated during the build process and used as the forwarding port.
+
+<!-- End of code generated from the comments of the PortForwardConfig struct in builder/kubevirt/iso/step_start_portforward.go; -->
+
 <!-- Code generated from the comments of the Config struct in communicator/config.go; DO NOT EDIT MANUALLY -->
 
 - `communicator` (string) - Packer currently supports three kinds of communicators:

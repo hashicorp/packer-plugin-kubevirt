@@ -69,6 +69,8 @@ type FlatConfig struct {
 	WinRMUseNTLM              *bool             `mapstructure:"winrm_use_ntlm" cty:"winrm_use_ntlm" hcl:"winrm_use_ntlm"`
 	WaitTimeout               *string           `mapstructure:"ip_wait_timeout" cty:"ip_wait_timeout" hcl:"ip_wait_timeout"`
 	SettleTimeout             *string           `mapstructure:"ip_settle_timeout" cty:"ip_settle_timeout" hcl:"ip_settle_timeout"`
+	DisableForwarding         *bool             `mapstructure:"disable_forwarding" required:"false" cty:"disable_forwarding" hcl:"disable_forwarding"`
+	ForwardingPort            *int              `mapstructure:"forwarding_port" required:"false" cty:"forwarding_port" hcl:"forwarding_port"`
 	KubeConfig                *string           `mapstructure:"kube_config" required:"true" cty:"kube_config" hcl:"kube_config"`
 	Name                      *string           `mapstructure:"name" required:"true" cty:"name" hcl:"name"`
 	Namespace                 *string           `mapstructure:"namespace" required:"true" cty:"namespace" hcl:"namespace"`
@@ -163,6 +165,8 @@ func (*FlatConfig) HCL2Spec() map[string]hcldec.Spec {
 		"winrm_use_ntlm":               &hcldec.AttrSpec{Name: "winrm_use_ntlm", Type: cty.Bool, Required: false},
 		"ip_wait_timeout":              &hcldec.AttrSpec{Name: "ip_wait_timeout", Type: cty.String, Required: false},
 		"ip_settle_timeout":            &hcldec.AttrSpec{Name: "ip_settle_timeout", Type: cty.String, Required: false},
+		"disable_forwarding":           &hcldec.AttrSpec{Name: "disable_forwarding", Type: cty.Bool, Required: false},
+		"forwarding_port":              &hcldec.AttrSpec{Name: "forwarding_port", Type: cty.Number, Required: false},
 		"kube_config":                  &hcldec.AttrSpec{Name: "kube_config", Type: cty.String, Required: false},
 		"name":                         &hcldec.AttrSpec{Name: "name", Type: cty.String, Required: false},
 		"namespace":                    &hcldec.AttrSpec{Name: "namespace", Type: cty.String, Required: false},
