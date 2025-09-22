@@ -92,6 +92,10 @@ func (b *Builder) Run(ctx context.Context, ui packer.Ui, hook packer.Hook) (pack
 
 	if b.config.Comm.Type != "none" {
 		steps = append(steps,
+			&StepWaitForIp{
+				Config: b.config,
+				Client: b.client,
+			},
 			&StepStartPortForward{
 				Config:        b.config,
 				Client:        b.client,

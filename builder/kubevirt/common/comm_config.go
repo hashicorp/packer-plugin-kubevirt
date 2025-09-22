@@ -16,13 +16,20 @@ func CommHost(host string) func(multistep.StateBag) (string, error) {
 		if fwdhost != nil {
 			return fwdhost.(string), nil
 		}
-		// host would be provided by the user via ssh_host:
+		// host would be provided by the user via ssh_host config option.
+		// If so, override any detected IP:
 		if host != "" {
 			return host, nil
 		}
+		// If the wait_for_ip step has detected an IP and we haven't yet
+		// selected one, use that IP:
+		guestIp := state.Get("ip")
+		if guestIp != nil {
+			return guestIp.(string), nil
+		}
 		// Otherwise, return an error. We don't want to return nothing
 		// for the connection target:
-		return "", fmt.Errorf("no forwarding host or specified host found")
+		return "", fmt.Errorf("no forwarding host, guest-provided IP, or specified host found")
 	}
 }
 
