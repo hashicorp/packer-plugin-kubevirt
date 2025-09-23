@@ -1,5 +1,6 @@
 /*
- * This file is part of the KubeVirt project
+ * This file is based on the portforwarder file contained in
+ * the KubeVirt project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,12 +22,12 @@ package common
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"strings"
 
 	kvcorev1 "kubevirt.io/client-go/kubevirt/typed/core/v1"
-	"kubevirt.io/client-go/log"
 )
 
 const (
@@ -53,16 +54,16 @@ type PortforwardableResource interface {
 	PortForward(name string, port int, protocol string) (kvcorev1.StreamInterface, error)
 }
 
-func (p *PortForwarder) StartForwarding(address *net.IPAddr, port ForwardedPort) error {
-	log.Log.Infof("forwarding %s %s:%d to %d", port.Protocol, address, port.Local, port.Remote)
+func (p *PortForwarder) StartForwarding(address *net.IPAddr, port ForwardedPort) (net.Addr, error) {
+	fmt.Printf("port forwarder: forwarding %s %s:%d to %d", port.Protocol, address, port.Local, port.Remote)
 
 	if port.Protocol == ProtocolTCP {
 		return p.StartForwardingTCP(address, port)
 	}
-	return errors.New("unknown protocol: " + port.Protocol)
+	return nil, errors.New("unknown protocol: " + port.Protocol)
 }
 
-func (p *PortForwarder) StartForwardingTCP(address *net.IPAddr, port ForwardedPort) error {
+func (p *PortForwarder) StartForwardingTCP(address *net.IPAddr, port ForwardedPort) (net.Addr, error) {
 	listener, err := net.ListenTCP(
 		port.Protocol,
 		&net.TCPAddr{
@@ -71,25 +72,25 @@ func (p *PortForwarder) StartForwardingTCP(address *net.IPAddr, port ForwardedPo
 			Port: port.Local,
 		})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	go p.WaitForConnection(listener, port)
-	return nil
+	return listener.Addr(), nil
 }
 
 func (p *PortForwarder) WaitForConnection(listener net.Listener, port ForwardedPort) {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			log.Log.Errorf("error accepting connection: %v", err)
-			return
+			fmt.Printf("port forwarder: error accepting connection: %v", err)
+			continue
 		}
-		log.Log.Infof("opening new tcp tunnel to %d", port.Remote)
+		fmt.Printf("port forwarder: opening new tcp tunnel to %d", port.Remote)
 		stream, err := p.Resource.PortForward(p.Name, port.Remote, port.Protocol)
 		if err != nil {
-			log.Log.Errorf("can't access %s/%s.%s: %v", p.Kind, p.Name, p.Namespace, err)
-			return
+			fmt.Printf("port forwarder: can't access %s/%s.%s: %v", p.Kind, p.Name, p.Namespace, err)
+			continue
 		}
 		go p.HandleConnection(conn, stream.AsConn(), port)
 	}
@@ -98,7 +99,7 @@ func (p *PortForwarder) WaitForConnection(listener net.Listener, port ForwardedP
 // handleConnection copies data between the local connection and the stream to
 // the remote server.
 func (p *PortForwarder) HandleConnection(local, remote net.Conn, port ForwardedPort) {
-	log.Log.Infof("handling tcp connection for %d", port.Local)
+	fmt.Printf("port forwarder: handling tcp connection for %d", port.Local)
 	errs := make(chan error)
 	go func() {
 		_, err := io.Copy(remote, local)
@@ -117,6 +118,6 @@ func (p *PortForwarder) HandleConnection(local, remote net.Conn, port ForwardedP
 
 func HandleConnectionError(err error, port ForwardedPort) {
 	if err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
-		log.Log.Errorf("error handling connection for %d: %v", port.Local, err)
+		fmt.Printf("port forwarder: error handling connection for %d: %v", port.Local, err)
 	}
 }

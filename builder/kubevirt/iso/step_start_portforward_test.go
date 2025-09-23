@@ -16,6 +16,7 @@ import (
 
 	"github.com/hashicorp/packer-plugin-kubevirt/builder/kubevirt/common"
 	"github.com/hashicorp/packer-plugin-kubevirt/builder/kubevirt/iso"
+	"github.com/hashicorp/packer-plugin-sdk/communicator"
 	"github.com/hashicorp/packer-plugin-sdk/multistep"
 	"github.com/hashicorp/packer-plugin-sdk/packer"
 
@@ -25,12 +26,14 @@ import (
 
 type mockPortForwarder struct {
 	called bool
+	addr   net.Addr
 	err    error
 }
 
-func (m *mockPortForwarder) StartForwarding(address *net.IPAddr, port common.ForwardedPort) error {
+func (m *mockPortForwarder) StartForwarding(address *net.IPAddr, port common.ForwardedPort) (net.Addr, error) {
 	m.called = true
-	return m.err
+
+	return m.addr, m.err
 }
 
 var _ = Describe("StepStartPortForward", func() {
@@ -68,19 +71,29 @@ var _ = Describe("StepStartPortForward", func() {
 		kubecli.MockKubevirtClientInstance = mockVirt
 
 		mockVirt.EXPECT().
-			VirtualMachine(namespace).
-			Return(vmClient.KubevirtV1().VirtualMachines(namespace)).
+			VirtualMachineInstance(namespace).
+			Return(vmClient.KubevirtV1().VirtualMachineInstances(namespace)).
 			AnyTimes()
 
 		virtClient, _ = kubecli.GetKubevirtClientFromClientConfig(nil)
 
-		mockFwd = &mockPortForwarder{}
+		mockFwd = &mockPortForwarder{
+			addr: &net.TCPAddr{
+				IP:   net.ParseIP("127.0.0.1"),
+				Port: 1234,
+			},
+		}
+
 		step = &iso.StepStartPortForward{
 			Config: iso.Config{
-				Name:          name,
-				Namespace:     namespace,
-				Communicator:  "ssh",
-				SSHHost:       "127.0.0.1",
+				Name:      name,
+				Namespace: namespace,
+				Comm: communicator.Config{
+					Type: "ssh",
+					SSH: communicator.SSH{
+						SSHHost: "127.0.0.1",
+					},
+				},
 				SSHLocalPort:  2222,
 				SSHRemotePort: 22,
 			},
@@ -117,8 +130,12 @@ var _ = Describe("StepStartPortForward", func() {
 		})
 
 		It("works with WinRM configuration", func() {
-			step.Config.Communicator = "winrm"
-			step.Config.WinRMHost = "127.0.0.1"
+			step.Config.Comm = communicator.Config{
+				Type: "winrm",
+				WinRM: communicator.WinRM{
+					WinRMHost: "127.0.0.1",
+				},
+			}
 			step.Config.WinRMLocalPort = 5985
 			step.Config.WinRMRemotePort = 5985
 
