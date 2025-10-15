@@ -72,8 +72,12 @@ type Config struct {
 
 	// KubeConfig is the path to the kubeconfig file.
 	KubeConfig string `mapstructure:"kube_config" required:"true"`
-	// Name is the name of the VM image.
+	// Name is the name of the DataSource resulting from the built image.
 	Name string `mapstructure:"name" required:"true"`
+	// VMName is the name of the temporary VM instance. If not specified,
+	// it will default to the same value as the Name. VMName is also used as
+	// the base for naming other temporary resources such as the ConfigMap.
+	VMName string `mapstructure:"vm_name" required:"false"`
 	// Namespace is the namespace in which to create the VM image.
 	Namespace string `mapstructure:"namespace" required:"true"`
 	// ISO Volume Name is the name of the DataVolume resource that contains the installation ISO.
@@ -164,6 +168,11 @@ func (c *Config) Prepare(raws ...interface{}) ([]string, error) {
 		if c.Comm.Host() == "" && c.DisableForwarding {
 			warnings = append(warnings, "Direct connections (direct_connect=true) likely will not work when using a pod network")
 		}
+	}
+
+	// Default the VMName to the DataSource name, if not otherwise specified:
+	if c.VMName == "" {
+		c.VMName = c.Name
 	}
 
 	if len(errs.Errors) > 0 {

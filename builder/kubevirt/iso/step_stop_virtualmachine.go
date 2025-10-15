@@ -23,12 +23,12 @@ type StepStopVirtualMachine struct {
 
 func (s *StepStopVirtualMachine) Run(ctx context.Context, state multistep.StateBag) multistep.StepAction {
 	ui := state.Get("ui").(packer.Ui)
-	name := s.Config.Name
+	vmname := s.Config.VMName
 	namespace := s.Config.Namespace
 
-	ui.Sayf("Stopping the temporary VirtualMachine (%s/%s)...", namespace, name)
+	ui.Sayf("Stopping the temporary VirtualMachine (%s/%s)...", namespace, vmname)
 
-	vm, err := s.Client.VirtualMachine(namespace).Get(ctx, name, metav1.GetOptions{})
+	vm, err := s.Client.VirtualMachine(namespace).Get(ctx, vmname, metav1.GetOptions{})
 	if err != nil {
 		ui.Error(err.Error())
 		return multistep.ActionHalt

@@ -82,7 +82,7 @@ var _ = Describe("StepWaitForIp", func() {
 
 		step = &iso.StepWaitForAgent{
 			Config: iso.Config{
-				Name:               name,
+				VMName:             name,
 				Namespace:          namespace,
 				WaitForAgentConfig: iso.WaitForAgentConfig{},
 			},

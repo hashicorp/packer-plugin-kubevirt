@@ -81,7 +81,7 @@ var _ = Describe("StepWaitForIp", func() {
 
 		step = &iso.StepWaitForIp{
 			Config: iso.Config{
-				Name:         name,
+				VMName:       name,
 				Namespace:    namespace,
 				WaitIpConfig: iso.WaitIpConfig{},
 			},

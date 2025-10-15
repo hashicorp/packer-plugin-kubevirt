@@ -137,7 +137,7 @@ func doGetIp(ctx context.Context, client kubecli.KubevirtClient, config Config) 
 	}
 
 loop:
-	ip, err := vmGetIp(ctx, client, config.Namespace, config.Name)
+	ip, err := vmGetIp(ctx, client, config.Namespace, config.VMName)
 	if err != nil {
 		return "", err
 	}

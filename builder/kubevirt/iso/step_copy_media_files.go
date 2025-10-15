@@ -20,13 +20,13 @@ type StepCopyMediaFiles struct {
 
 func (s *StepCopyMediaFiles) Run(ctx context.Context, state multistep.StateBag) multistep.StepAction {
 	ui := state.Get("ui").(packer.Ui)
-	name := s.Config.Name
+	vmname := s.Config.VMName
 	namespace := s.Config.Namespace
 	mediaFiles := s.Config.MediaFiles
 
-	ui.Sayf("Creating a new ConfigMap to store media files (%s/%s)...", namespace, name)
+	ui.Sayf("Creating a new ConfigMap to store media files (%s/%s)...", namespace, vmname)
 
-	configMap, err := configMap(name, mediaFiles)
+	configMap, err := configMap(vmname, mediaFiles)
 	if err != nil {
 		ui.Error(err.Error())
 		return multistep.ActionHalt
@@ -42,10 +42,10 @@ func (s *StepCopyMediaFiles) Run(ctx context.Context, state multistep.StateBag) 
 
 func (s *StepCopyMediaFiles) Cleanup(state multistep.StateBag) {
 	ui := state.Get("ui").(packer.Ui)
-	name := s.Config.Name
+	vmname := s.Config.VMName
 	namespace := s.Config.Namespace
 
-	ui.Sayf("Deleting ConfigMap (%s/%s)...", namespace, name)
+	ui.Sayf("Deleting ConfigMap (%s/%s)...", namespace, vmname)
 
-	_ = s.Client.CoreV1().ConfigMaps(namespace).Delete(context.Background(), name, metav1.DeleteOptions{})
+	_ = s.Client.CoreV1().ConfigMaps(namespace).Delete(context.Background(), vmname, metav1.DeleteOptions{})
 }

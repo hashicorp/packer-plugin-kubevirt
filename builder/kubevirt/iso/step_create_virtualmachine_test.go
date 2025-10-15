@@ -73,7 +73,7 @@ var _ = Describe("StepCreateVirtualMachine", func() {
 
 		step = &iso.StepCreateVirtualMachine{
 			Config: iso.Config{
-				Name:                name,
+				VMName:              name,
 				Namespace:           namespace,
 				IsoVolumeName:       "iso-vol",
 				DiskSize:            "1Gi",

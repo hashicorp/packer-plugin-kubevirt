@@ -31,6 +31,7 @@ var _ = Describe("StepCreateBootableVolume", func() {
 	const (
 		namespace = "test-ns"
 		name      = "boot-dv"
+		vmname    = "test-vm"
 	)
 
 	var (
@@ -61,6 +62,7 @@ var _ = Describe("StepCreateBootableVolume", func() {
 		step = &iso.StepCreateBootableVolume{
 			Config: iso.Config{
 				Name:         name,
+				VMName:       vmname,
 				Namespace:    namespace,
 				DiskSize:     "10Gi",
 				InstanceType: "cx1.large",

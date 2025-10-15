@@ -22,11 +22,12 @@ type StepCreateBootableVolume struct {
 func (s *StepCreateBootableVolume) Run(ctx context.Context, state multistep.StateBag) multistep.StepAction {
 	ui := state.Get("ui").(packer.Ui)
 	name := s.Config.Name
+	vmname := s.Config.VMName
 	namespace := s.Config.Namespace
 	diskSize := s.Config.DiskSize
 	instanceType := s.Config.InstanceType
 	preferenceName := s.Config.Preference
-	cloneVolume := cloneVolume(name, namespace, diskSize)
+	cloneVolume := cloneVolume(name, vmname, namespace, diskSize)
 	sourceVolume := sourceVolume(name, namespace, instanceType, preferenceName)
 
 	ui.Sayf("Creating a new bootable volume (%s/%s)...", namespace, name)

@@ -41,7 +41,7 @@ build {
 
 - `kube_config` (string) - KubeConfig is the path to the kubeconfig file.
 
-- `name` (string) - Name is the name of the VM image.
+- `name` (string) - Name is the name of the DataSource resulting from the built image.
 
 - `namespace` (string) - Namespace is the namespace in which to create the VM image.
 
@@ -60,6 +60,10 @@ build {
 ### Not Required Configuration
 
 <!-- Code generated from the comments of the Config struct in builder/kubevirt/iso/config.go; DO NOT EDIT MANUALLY -->
+
+- `vm_name` (string) - VMName is the name of the temporary VM instance. If not specified,
+  it will default to the same value as the Name. VMName is also used as
+  the base for naming other temporary resources such as the ConfigMap.
 
 - `instance_type_kind` (string) - InstanceTypeKind is the kind of the InstanceType resource to use in the temporary VM.
   Other supported value is "virtualmachineclusterinstancetype".

@@ -37,7 +37,7 @@ func (s *StepWaitForAgent) Run(ctx context.Context, state multistep.StateBag) mu
 	var interval time.Duration
 
 	ui := state.Get("ui").(packer.Ui)
-	name := s.Config.Name
+	vmname := s.Config.VMName
 	namespace := s.Config.Namespace
 	agentWaitTimeout := s.Config.AgentWaitTimeout
 
@@ -72,7 +72,7 @@ func (s *StepWaitForAgent) Run(ctx context.Context, state multistep.StateBag) mu
 			log.Println("[DEBUG] Looping waiting for Guest Agent...")
 		}
 
-		vmi, err := s.Client.VirtualMachineInstance(namespace).Get(ctx, name, metav1.GetOptions{})
+		vmi, err := s.Client.VirtualMachineInstance(namespace).Get(ctx, vmname, metav1.GetOptions{})
 
 		if err != nil {
 			ui.Error(err.Error())

@@ -130,19 +130,19 @@ func virtualMachine(
 	}
 }
 
-func cloneVolume(name, namespace, diskSize string) *cdiv1.DataVolume {
+func cloneVolume(volname, vmname, namespace, diskSize string) *cdiv1.DataVolume {
 	return &cdiv1.DataVolume{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: cdiv1.CDIGroupVersionKind.GroupVersion().String(),
 			Kind:       "DataVolume",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
+			Name: volname,
 		},
 		Spec: cdiv1.DataVolumeSpec{
 			Source: &cdiv1.DataVolumeSource{
 				PVC: &cdiv1.DataVolumeSourcePVC{
-					Name:      name + "-rootdisk",
+					Name:      vmname + "-rootdisk",
 					Namespace: namespace,
 				},
 			},

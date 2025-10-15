@@ -46,7 +46,7 @@ func (s *StepStartPortForward) Run(ctx context.Context, state multistep.StateBag
 	var remotePort int
 
 	ui := state.Get("ui").(packer.Ui)
-	name := s.Config.Name
+	vmname := s.Config.VMName
 	namespace := s.Config.Namespace
 
 	if s.Config.Comm.Type == "none" {
@@ -73,7 +73,7 @@ func (s *StepStartPortForward) Run(ctx context.Context, state multistep.StateBag
 	if factory == nil {
 		factory = DefaultPortForwarder
 	}
-	forwarder := factory("vmi", namespace, name, vmi)
+	forwarder := factory("vmi", namespace, vmname, vmi)
 
 	errChan := make(chan error, 1)
 	portChan := make(chan int, 1)

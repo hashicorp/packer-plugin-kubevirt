@@ -51,7 +51,7 @@ var _ = Describe("StepCopyMediaFiles", func() {
 
 		step = &iso.StepCopyMediaFiles{
 			Config: iso.Config{
-				Name:       name,
+				VMName:     name,
 				Namespace:  namespace,
 				MediaFiles: []string{"file1.iso", "file2.iso"},
 			},
