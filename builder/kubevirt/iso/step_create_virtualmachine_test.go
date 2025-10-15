@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/packer-plugin-sdk/multistep"
 	"github.com/hashicorp/packer-plugin-sdk/packer"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	fakek8sclient "k8s.io/client-go/kubernetes/fake"
@@ -83,6 +84,9 @@ var _ = Describe("StepCreateVirtualMachine", func() {
 				PreferenceKind:      "instancetype.kubevirt.io",
 				OperatingSystemType: "linux",
 				KeepVM:              false,
+				Media: iso.MediaConfig{
+					Label: "OEMDRV",
+				},
 			},
 			Client: virtClient,
 		}
@@ -115,6 +119,157 @@ var _ = Describe("StepCreateVirtualMachine", func() {
 
 			action := step.Run(ctx, state)
 			Expect(action).To(Equal(multistep.ActionContinue))
+		})
+
+		When("creating a Linux VM", func() {
+			var (
+				ctx context.Context
+				vm  *v1.VirtualMachine
+			)
+
+			BeforeEach(func() {
+				var cancel func()
+				var err error
+
+				// Let Run create the VM, then mark it Ready
+				ctx, cancel = context.WithCancel(context.Background())
+				defer cancel()
+
+				// Watch for VM creation and patch Ready status
+				vmClient.Fake.PrependReactor("create", "virtualmachines", func(action k8stesting.Action) (bool, runtime.Object, error) {
+					create := action.(k8stesting.CreateAction)
+					obj := create.GetObject().(*v1.VirtualMachine)
+					// Simulate that VM is created and becomes Ready
+					obj.Status.Ready = true
+					return false, obj, nil
+				})
+
+				action := step.Run(ctx, state)
+				Expect(action).To(Equal(multistep.ActionContinue))
+				vm, err = vmClient.KubevirtV1().VirtualMachines(namespace).Get(context.Background(), name, metav1.GetOptions{})
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("sets the instance type correctly", func() {
+				Expect(vm.Spec.Instancetype.Kind).To(Equal("instancetype.kubevirt.io"))
+				Expect(vm.Spec.Instancetype.Name).To(Equal("cx1.medium"))
+			})
+
+			It("sets the preference correctly", func() {
+				Expect(vm.Spec.Preference.Kind).To(Equal("instancetype.kubevirt.io"))
+				Expect(vm.Spec.Preference.Name).To(Equal("fedora"))
+			})
+
+			It("sets the DataVolumeTemplate root disk name correctly", func() {
+				Expect(vm.Spec.DataVolumeTemplates[0].ObjectMeta.Name).To(Equal(name + "-rootdisk"))
+				Expect(vm.Spec.DataVolumeTemplates[0].Spec.PVC.Resources.Requests.Storage().Value()).To(Equal(int64(1 << 30)))
+				Expect(vm.Spec.DataVolumeTemplates[0].Spec.PVC.AccessModes[0]).To(Equal(corev1.ReadWriteOnce))
+			})
+
+			It("configures no networks when none are specified", func() {
+				Expect(vm.Spec.Template.Spec.Networks).To(BeEmpty())
+				Expect(vm.Spec.Template.Spec.Domain.Devices.Interfaces).To(BeEmpty())
+			})
+
+			It("configures the rootdisk device correctly", func() {
+				Expect(vm.Spec.Template.Spec.Domain.Devices.Disks[0].Name).To(Equal("rootdisk"))
+				Expect(vm.Spec.Template.Spec.Domain.Devices.Disks[0].DiskDevice.Disk).To(Equal(&v1.DiskTarget{}))
+				Expect(vm.Spec.Template.Spec.Domain.Devices.Disks[0].BootOrder).To(HaveValue(Equal(uint(1))))
+			})
+
+			It("configures the install ISO device correctly", func() {
+				Expect(vm.Spec.Template.Spec.Domain.Devices.Disks[1].Name).To(Equal("cdrom"))
+				Expect(vm.Spec.Template.Spec.Domain.Devices.Disks[1].DiskDevice.CDRom).To(
+					Equal(&v1.CDRomTarget{Tray: "closed", Bus: "sata"}),
+				)
+				Expect(vm.Spec.Template.Spec.Domain.Devices.Disks[1].BootOrder).To(HaveValue(Equal(uint(2))))
+			})
+
+			It("configures the userdata device correctly", func() {
+				Expect(vm.Spec.Template.Spec.Domain.Devices.Disks[2].Name).To(Equal("userdata"))
+				Expect(vm.Spec.Template.Spec.Domain.Devices.Disks[2].DiskDevice.CDRom).To(
+					Equal(&v1.CDRomTarget{Tray: "closed", Bus: "sata"}),
+				)
+				Expect(vm.Spec.Template.Spec.Domain.Devices.Disks[2].BootOrder).To(BeNil())
+			})
+
+			It("does not configure the virtio container disk device", func() {
+				Expect(len(vm.Spec.Template.Spec.Domain.Devices.Disks)).To(Equal(3))
+			})
+
+			It("configures the rootdisk volume correctly", func() {
+				Expect(vm.Spec.Template.Spec.Volumes[0].Name).To(Equal("rootdisk"))
+				Expect(vm.Spec.Template.Spec.Volumes[0].VolumeSource.DataVolume.Name).To(Equal(name + "-rootdisk"))
+			})
+
+			It("configures the ISO install volume correctly", func() {
+				Expect(vm.Spec.Template.Spec.Volumes[1].Name).To(Equal("cdrom"))
+				Expect(vm.Spec.Template.Spec.Volumes[1].VolumeSource.DataVolume.Name).To(Equal("iso-vol"))
+			})
+
+			It("configures the userdata volume correctly", func() {
+				Expect(vm.Spec.Template.Spec.Volumes[2].Name).To(Equal("userdata"))
+				Expect(vm.Spec.Template.Spec.Volumes[2].VolumeSource.ConfigMap.LocalObjectReference.Name).To(Equal(name))
+				Expect(vm.Spec.Template.Spec.Volumes[2].VolumeSource.ConfigMap.VolumeLabel).To(Equal("OEMDRV"))
+			})
+		})
+
+		When("creating a Windows VM", func() {
+			var (
+				ctx context.Context
+				vm  *v1.VirtualMachine
+			)
+
+			BeforeEach(func() {
+				var cancel func()
+				var err error
+
+				// Let Run create the VM, then mark it Ready
+				ctx, cancel = context.WithCancel(context.Background())
+				defer cancel()
+
+				// Watch for VM creation and patch Ready status
+				vmClient.Fake.PrependReactor("create", "virtualmachines", func(action k8stesting.Action) (bool, runtime.Object, error) {
+					create := action.(k8stesting.CreateAction)
+					obj := create.GetObject().(*v1.VirtualMachine)
+					// Simulate that VM is created and becomes Ready
+					obj.Status.Ready = true
+					return false, obj, nil
+				})
+
+				step.Config.OperatingSystemType = "windows"
+
+				action := step.Run(ctx, state)
+				Expect(action).To(Equal(multistep.ActionContinue))
+				vm, err = vmClient.KubevirtV1().VirtualMachines(namespace).Get(context.Background(), name, metav1.GetOptions{})
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("configures the virtio container disk correctly", func() {
+				Expect(vm.Spec.Template.Spec.Domain.Devices.Disks[2].Name).To(Equal("virtiocontainerdisk"))
+				Expect(vm.Spec.Template.Spec.Domain.Devices.Disks[2].DiskDevice.CDRom).To(
+					Equal(&v1.CDRomTarget{Tray: "closed", Bus: "sata"}),
+				)
+				Expect(vm.Spec.Template.Spec.Domain.Devices.Disks[2].BootOrder).To(BeNil())
+			})
+
+			It("configures the userdata/sysprep device correctly", func() {
+				Expect(vm.Spec.Template.Spec.Domain.Devices.Disks[3].Name).To(Equal("userdata"))
+				Expect(vm.Spec.Template.Spec.Domain.Devices.Disks[3].DiskDevice.CDRom).To(
+					Equal(&v1.CDRomTarget{Tray: "closed", Bus: "sata"}),
+				)
+				Expect(vm.Spec.Template.Spec.Domain.Devices.Disks[3].BootOrder).To(BeNil())
+			})
+
+			It("configures the sysprep volume correctly", func() {
+				Expect(vm.Spec.Template.Spec.Volumes[2].Name).To(Equal("userdata"))
+				Expect(vm.Spec.Template.Spec.Volumes[2].VolumeSource.Sysprep.ConfigMap.Name).To(Equal(name))
+			})
+
+			It("configures the virtio volume correctly", func() {
+				Expect(vm.Spec.Template.Spec.Volumes[3].Name).To(Equal("virtiocontainerdisk"))
+				Expect(vm.Spec.Template.Spec.Volumes[3].VolumeSource.ContainerDisk.Image).To(Equal("quay.io/kubevirt/virtio-container-disk:v1.5.2"))
+			})
 		})
 
 		It("halts when VM creation fails", func() {

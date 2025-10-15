@@ -34,6 +34,7 @@ func (s *StepCreateVirtualMachine) Run(ctx context.Context, state multistep.Stat
 	preferenceKind := s.Config.PreferenceKind
 	osType := s.Config.OperatingSystemType
 	networks := s.Config.Networks
+	mediaLabel := s.Config.Media.Label
 
 	if osType == "" || (osType != "linux" && osType != "windows") {
 		ui.Errorf("OS type of '%s' is not supported, set 'linux' or 'windows'.", osType)
@@ -49,7 +50,8 @@ func (s *StepCreateVirtualMachine) Run(ctx context.Context, state multistep.Stat
 		instanceTypeKind,
 		preferenceKind,
 		osType,
-		networks)
+		networks,
+		mediaLabel)
 
 	ui.Sayf("Creating a new temporary VirtualMachine (%s/%s)...", namespace, vmname)
 

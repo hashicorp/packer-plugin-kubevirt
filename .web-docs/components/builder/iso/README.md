@@ -77,8 +77,6 @@ build {
 - `networks` ([]Network) - Networks is a list of networks to attach to the temporary VM.
   If no networks are specified, a single pod network will be used.
 
-- `media_files` ([]string) - MediaFiles is a path list of files to be copied and used during the ISO installation.
-
 - `boot_command` ([]string) - BootCommand is a list of strings that represent the keystrokes to be sent to the VM console
   to automate the installation via a new VNC connection.
 
@@ -101,6 +99,40 @@ build {
   resource leaks.
 
 <!-- End of code generated from the comments of the Config struct in builder/kubevirt/iso/config.go; -->
+
+
+### User Media Configuration
+
+**Optional**:
+
+<!-- Code generated from the comments of the MediaConfig struct in builder/kubevirt/iso/step_copy_media_files.go; DO NOT EDIT MANUALLY -->
+
+- `media_label` (string) - Label is the disk volume label to use on the virtual drive
+  constructed and attached to the VM. This is ignored for Windows systems.
+  Defaults to `OEMDRV`.
+
+- `media_files` ([]string) - Files is a list of files to be copied into the generated ConfigMap
+  which is used to provide additional install-time files to the VM.
+  Defaults to an empty list.
+
+- `media_content` (map[string]string) - Content is a map of content to include in the generated media volume.
+  The map keys are the filenames and the map values are the file
+  contents.  This permits the use of HCL functions such as `file` and
+  `templatefile` to populate the ConfigMap.
+  If a filename matches a file included in `media_files` then the
+  contents specified here takes precedence.
+  Defaults to an empty list.
+
+- `keep_media` (bool) - If true, KeepMedia indicates that the created ConfigMap consisting
+  of files (provided via `media_files` or `media_content`) should not
+  be removed at the end of the build . If false, the ConfigMap will
+  be removed.
+  
+  This can be useful for debugging purposes, to inspect the generated
+  ConfigMap contents. However, it is recommended that this is set
+  to false for regular production use.
+
+<!-- End of code generated from the comments of the MediaConfig struct in builder/kubevirt/iso/step_copy_media_files.go; -->
 
 
 ### Network Configuration

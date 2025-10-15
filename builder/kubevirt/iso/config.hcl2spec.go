@@ -67,6 +67,10 @@ type FlatConfig struct {
 	WinRMUseSSL               *bool             `mapstructure:"winrm_use_ssl" cty:"winrm_use_ssl" hcl:"winrm_use_ssl"`
 	WinRMInsecure             *bool             `mapstructure:"winrm_insecure" cty:"winrm_insecure" hcl:"winrm_insecure"`
 	WinRMUseNTLM              *bool             `mapstructure:"winrm_use_ntlm" cty:"winrm_use_ntlm" hcl:"winrm_use_ntlm"`
+	Label                     *string           `mapstructure:"media_label" required:"false" cty:"media_label" hcl:"media_label"`
+	Files                     []string          `mapstructure:"media_files" required:"false" cty:"media_files" hcl:"media_files"`
+	Content                   map[string]string `mapstructure:"media_content" required:"false" cty:"media_content" hcl:"media_content"`
+	Keep                      *bool             `mapstructure:"keep_media" required:"false" cty:"keep_media" hcl:"keep_media"`
 	WaitTimeout               *string           `mapstructure:"ip_wait_timeout" cty:"ip_wait_timeout" hcl:"ip_wait_timeout"`
 	SettleTimeout             *string           `mapstructure:"ip_settle_timeout" cty:"ip_settle_timeout" hcl:"ip_settle_timeout"`
 	DisableForwarding         *bool             `mapstructure:"disable_forwarding" required:"false" cty:"disable_forwarding" hcl:"disable_forwarding"`
@@ -84,7 +88,6 @@ type FlatConfig struct {
 	PreferenceKind            *string           `mapstructure:"preference_kind" required:"false" cty:"preference_kind" hcl:"preference_kind"`
 	OperatingSystemType       *string           `mapstructure:"os_type" required:"false" cty:"os_type" hcl:"os_type"`
 	Networks                  []FlatNetwork     `mapstructure:"networks" required:"false" cty:"networks" hcl:"networks"`
-	MediaFiles                []string          `mapstructure:"media_files" required:"false" cty:"media_files" hcl:"media_files"`
 	BootCommand               []string          `mapstructure:"boot_command" required:"false" cty:"boot_command" hcl:"boot_command"`
 	BootWait                  *string           `mapstructure:"boot_wait" required:"false" cty:"boot_wait" hcl:"boot_wait"`
 	InstallationWaitTimeout   *string           `mapstructure:"installation_wait_timeout" required:"false" cty:"installation_wait_timeout" hcl:"installation_wait_timeout"`
@@ -165,6 +168,10 @@ func (*FlatConfig) HCL2Spec() map[string]hcldec.Spec {
 		"winrm_use_ssl":                &hcldec.AttrSpec{Name: "winrm_use_ssl", Type: cty.Bool, Required: false},
 		"winrm_insecure":               &hcldec.AttrSpec{Name: "winrm_insecure", Type: cty.Bool, Required: false},
 		"winrm_use_ntlm":               &hcldec.AttrSpec{Name: "winrm_use_ntlm", Type: cty.Bool, Required: false},
+		"media_label":                  &hcldec.AttrSpec{Name: "media_label", Type: cty.String, Required: false},
+		"media_files":                  &hcldec.AttrSpec{Name: "media_files", Type: cty.List(cty.String), Required: false},
+		"media_content":                &hcldec.AttrSpec{Name: "media_content", Type: cty.Map(cty.String), Required: false},
+		"keep_media":                   &hcldec.AttrSpec{Name: "keep_media", Type: cty.Bool, Required: false},
 		"ip_wait_timeout":              &hcldec.AttrSpec{Name: "ip_wait_timeout", Type: cty.String, Required: false},
 		"ip_settle_timeout":            &hcldec.AttrSpec{Name: "ip_settle_timeout", Type: cty.String, Required: false},
 		"disable_forwarding":           &hcldec.AttrSpec{Name: "disable_forwarding", Type: cty.Bool, Required: false},
@@ -182,7 +189,6 @@ func (*FlatConfig) HCL2Spec() map[string]hcldec.Spec {
 		"preference_kind":              &hcldec.AttrSpec{Name: "preference_kind", Type: cty.String, Required: false},
 		"os_type":                      &hcldec.AttrSpec{Name: "os_type", Type: cty.String, Required: false},
 		"networks":                     &hcldec.BlockListSpec{TypeName: "networks", Nested: hcldec.ObjectSpec((*FlatNetwork)(nil).HCL2Spec())},
-		"media_files":                  &hcldec.AttrSpec{Name: "media_files", Type: cty.List(cty.String), Required: false},
 		"boot_command":                 &hcldec.AttrSpec{Name: "boot_command", Type: cty.List(cty.String), Required: false},
 		"boot_wait":                    &hcldec.AttrSpec{Name: "boot_wait", Type: cty.String, Required: false},
 		"installation_wait_timeout":    &hcldec.AttrSpec{Name: "installation_wait_timeout", Type: cty.String, Required: false},

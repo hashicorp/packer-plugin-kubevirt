@@ -5,8 +5,10 @@ package iso_test
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -35,10 +37,11 @@ var _ = Describe("StepCopyMediaFiles", func() {
 		state      *multistep.BasicStateBag
 		step       *iso.StepCopyMediaFiles
 		kubeClient *fakek8sclient.Clientset
+		uiErr      *strings.Builder
 	)
 
 	BeforeEach(func() {
-		uiErr := &strings.Builder{}
+		uiErr = &strings.Builder{}
 		ui := &packer.BasicUi{
 			Reader:      strings.NewReader(""),
 			Writer:      io.Discard,
@@ -51,9 +54,9 @@ var _ = Describe("StepCopyMediaFiles", func() {
 
 		step = &iso.StepCopyMediaFiles{
 			Config: iso.Config{
-				VMName:     name,
-				Namespace:  namespace,
-				MediaFiles: []string{"file1.iso", "file2.iso"},
+				VMName:    name,
+				Namespace: namespace,
+				Media:     iso.MediaConfig{},
 			},
 			Client: kubeClient,
 		}
@@ -62,29 +65,56 @@ var _ = Describe("StepCopyMediaFiles", func() {
 	Context("Run", func() {
 		It("continues when ConfigMap is created successfully", func() {
 			// Create dummy files so configMap() can read them
-			err := os.WriteFile("file1.iso", []byte("fake iso data 1"), 0644)
-			Expect(err).NotTo(HaveOccurred())
-			err = os.WriteFile("file2.iso", []byte("fake iso data 2"), 0644)
-			Expect(err).NotTo(HaveOccurred())
+			var files []string
 
-			defer os.Remove("file1.iso")
-			defer os.Remove("file2.iso")
+			for i := 1; i <= 4; i++ {
+				prefix := fmt.Sprintf("packer-plugin-kubevirt-file-%d", i)
+				tmpfile, err := os.CreateTemp(".", prefix)
+				Expect(err).NotTo(HaveOccurred())
+				fmt.Fprintf(tmpfile, "fake data %d", i)
+				defer os.Remove(tmpfile.Name())
+				files = append(files, filepath.Base(tmpfile.Name()))
+			}
+
+			step.Config.Media.Files = files
 
 			action := step.Run(context.Background(), state)
 			Expect(action).To(Equal(multistep.ActionContinue))
 
 			cm, err := kubeClient.CoreV1().ConfigMaps(namespace).Get(context.Background(), name, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
-			Expect(cm.Data).To(HaveKey("file1.iso"))
-			Expect(cm.Data).To(HaveKey("file2.iso"))
+
+			for i, file := range files {
+				Expect(cm.Data).To(HaveKey(file))
+				Expect(cm.Data[file]).To(Equal(fmt.Sprintf("fake data %d", i+1)))
+			}
+		})
+
+		It("continues when ConfigMap is created with provided content", func() {
+			step.Config.Media.Content = map[string]string{
+				"file1": "my content 1",
+				"file2": "my content 2",
+			}
+
+			action := step.Run(context.Background(), state)
+			Expect(action).To(Equal(multistep.ActionContinue))
+
+			cm, err := kubeClient.CoreV1().ConfigMaps(namespace).Get(context.Background(), name, metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			for file, content := range step.Config.Media.Content {
+				Expect(cm.Data).To(HaveKey(file))
+				Expect(cm.Data[file]).To(Equal(content))
+			}
 		})
 
 		It("halts when ConfigMap creation fails due to invalid media files", func() {
 			// Simulate invalid media file by injecting empty name
-			step.Config.MediaFiles = []string{""}
+			step.Config.Media.Files = []string{""}
 
 			action := step.Run(context.Background(), state)
 			Expect(action).To(Equal(multistep.ActionHalt))
+			Expect(uiErr.String()).To(ContainSubstring("no such file or directory"))
 		})
 
 		It("halts when ConfigMap creation fails due to API error", func() {

@@ -66,6 +66,7 @@ type Config struct {
 	common.PackerConfig `mapstructure:",squash"`
 
 	Comm               communicator.Config `mapstructure:",squash"`
+	Media              MediaConfig         `mapstructure:",squash"`
 	WaitIpConfig       `mapstructure:",squash"`
 	PortForwardConfig  `mapstructure:",squash"`
 	WaitForAgentConfig `mapstructure:",squash"`
@@ -101,8 +102,6 @@ type Config struct {
 	// Networks is a list of networks to attach to the temporary VM.
 	// If no networks are specified, a single pod network will be used.
 	Networks []Network `mapstructure:"networks" required:"false"`
-	// MediaFiles is a path list of files to be copied and used during the ISO installation.
-	MediaFiles []string `mapstructure:"media_files" required:"false"`
 	// BootCommand is a list of strings that represent the keystrokes to be sent to the VM console
 	// to automate the installation via a new VNC connection.
 	BootCommand []string `mapstructure:"boot_command" required:"false"`
@@ -152,6 +151,7 @@ func (c *Config) Prepare(raws ...interface{}) ([]string, error) {
 	errs := new(packersdk.MultiError)
 
 	errs = packersdk.MultiErrorAppend(errs, c.WaitIpConfig.Prepare()...)
+	errs = packersdk.MultiErrorAppend(errs, c.Media.Prepare()...)
 	errs = packersdk.MultiErrorAppend(errs, c.Comm.Prepare(&c.ctx)...)
 
 	for _, n := range c.Networks {
