@@ -93,6 +93,7 @@ type FlatConfig struct {
 	InstallationWaitTimeout   *string           `mapstructure:"installation_wait_timeout" required:"false" cty:"installation_wait_timeout" hcl:"installation_wait_timeout"`
 	SSHLocalPort              *int              `mapstructure:"ssh_local_port" required:"false" cty:"ssh_local_port" hcl:"ssh_local_port"`
 	SSHRemotePort             *int              `mapstructure:"ssh_remote_port" required:"false" undocumented:"true" cty:"ssh_remote_port" hcl:"ssh_remote_port"`
+	VirtIOContainer           *string           `mapstructure:"virtio_container" required:"false" cty:"virtio_container" hcl:"virtio_container"`
 	WinRMLocalPort            *int              `mapstructure:"winrm_local_port" required:"false" cty:"winrm_local_port" hcl:"winrm_local_port"`
 	WinRMRemotePort           *int              `mapstructure:"winrm_remote_port" required:"false" undocumented:"true" cty:"winrm_remote_port" hcl:"winrm_remote_port"`
 	WinRMWaitTimeout          *string           `mapstructure:"winrm_wait_timeout" required:"false" undocumented:"true" cty:"winrm_wait_timeout" hcl:"winrm_wait_timeout"`
@@ -194,6 +195,7 @@ func (*FlatConfig) HCL2Spec() map[string]hcldec.Spec {
 		"installation_wait_timeout":    &hcldec.AttrSpec{Name: "installation_wait_timeout", Type: cty.String, Required: false},
 		"ssh_local_port":               &hcldec.AttrSpec{Name: "ssh_local_port", Type: cty.Number, Required: false},
 		"ssh_remote_port":              &hcldec.AttrSpec{Name: "ssh_remote_port", Type: cty.Number, Required: false},
+		"virtio_container":             &hcldec.AttrSpec{Name: "virtio_container", Type: cty.String, Required: false},
 		"winrm_local_port":             &hcldec.AttrSpec{Name: "winrm_local_port", Type: cty.Number, Required: false},
 		"winrm_remote_port":            &hcldec.AttrSpec{Name: "winrm_remote_port", Type: cty.Number, Required: false},
 		"winrm_wait_timeout":           &hcldec.AttrSpec{Name: "winrm_wait_timeout", Type: cty.String, Required: false},

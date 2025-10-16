@@ -87,6 +87,10 @@ build {
 
 - `ssh_local_port` (int) - SSHLocalPort is the local port to use to connect via SSH.
 
+- `virtio_container` (string) - VirtIOContainer is the location of the VirtIO Container Image containing
+  the Windows VirtIO drivers. It will be mounted as a CD-ROM on Windows
+  builds.
+
 - `winrm_local_port` (int) - WinRMLocalPort is the local port to use to connect via WinRM.
 
 - `keep_vm` (bool) - KeepVM indicates whether to keep the temporary VM after the image has been created.

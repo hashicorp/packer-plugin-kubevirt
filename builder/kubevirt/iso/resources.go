@@ -33,7 +33,8 @@ func virtualMachine(
 	preferenceKind,
 	osType string,
 	networks []Network,
-	mediaLabel string) *v1.VirtualMachine {
+	mediaLabel string,
+	virtioContainer string) *v1.VirtualMachine {
 
 	vmNetworks := make([]v1.Network, len(networks))
 	vmInterfaces := make([]v1.Interface, len(networks))
@@ -97,7 +98,7 @@ func virtualMachine(
 							Disks:      getVirtualMachineDisks(osType),
 						},
 					},
-					Volumes: getVirtualMachineVolumes(name, isoVolumeName, osType, mediaLabel),
+					Volumes: getVirtualMachineVolumes(name, isoVolumeName, osType, mediaLabel, virtioContainer),
 				},
 			},
 		},
@@ -215,7 +216,7 @@ func getVirtualMachineDisks(osType string) []v1.Disk {
 	return disks
 }
 
-func getVirtualMachineVolumes(name, isoVolumeName string, osType string, label string) []v1.Volume {
+func getVirtualMachineVolumes(name, isoVolumeName string, osType string, label string, virtio string) []v1.Volume {
 	var osVols []v1.Volume
 
 	volumes := []v1.Volume{
@@ -253,7 +254,7 @@ func getVirtualMachineVolumes(name, isoVolumeName string, osType string, label s
 				Name: "virtiocontainerdisk",
 				VolumeSource: v1.VolumeSource{
 					ContainerDisk: &v1.ContainerDiskSource{
-						Image: "quay.io/kubevirt/virtio-container-disk:v1.5.2",
+						Image: virtio,
 					},
 				},
 			},

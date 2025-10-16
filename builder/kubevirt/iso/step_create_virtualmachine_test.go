@@ -87,6 +87,7 @@ var _ = Describe("StepCreateVirtualMachine", func() {
 				Media: iso.MediaConfig{
 					Label: "OEMDRV",
 				},
+				VirtIOContainer: "registry.example.com/virtio",
 			},
 			Client: virtClient,
 		}
@@ -268,7 +269,7 @@ var _ = Describe("StepCreateVirtualMachine", func() {
 
 			It("configures the virtio volume correctly", func() {
 				Expect(vm.Spec.Template.Spec.Volumes[3].Name).To(Equal("virtiocontainerdisk"))
-				Expect(vm.Spec.Template.Spec.Volumes[3].VolumeSource.ContainerDisk.Image).To(Equal("quay.io/kubevirt/virtio-container-disk:v1.5.2"))
+				Expect(vm.Spec.Template.Spec.Volumes[3].VolumeSource.ContainerDisk.Image).To(Equal("registry.example.com/virtio"))
 			})
 		})
 

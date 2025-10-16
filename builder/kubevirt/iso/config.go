@@ -115,6 +115,10 @@ type Config struct {
 	// SSHRemotePort is the remote port to use to connect via SSH.
 	// This has been deprecated in favor of ssh_port.
 	SSHRemotePort int `mapstructure:"ssh_remote_port" required:"false" undocumented:"true"`
+	// VirtIOContainer is the location of the VirtIO Container Image containing
+	// the Windows VirtIO drivers. It will be mounted as a CD-ROM on Windows
+	// builds.
+	VirtIOContainer string `mapstructure:"virtio_container" required:"false"`
 	// WinRMLocalPort is the local port to use to connect via WinRM.
 	WinRMLocalPort int `mapstructure:"winrm_local_port" required:"false"`
 	// WinRMRemotePort is the remote port to use to connect via WinRM.
@@ -173,6 +177,10 @@ func (c *Config) Prepare(raws ...interface{}) ([]string, error) {
 	// Default the VMName to the DataSource name, if not otherwise specified:
 	if c.VMName == "" {
 		c.VMName = c.Name
+	}
+
+	if c.VirtIOContainer == "" {
+		c.VirtIOContainer = "quay.io/kubevirt/virtio-container-disk:v1.6.2"
 	}
 
 	if len(errs.Errors) > 0 {
