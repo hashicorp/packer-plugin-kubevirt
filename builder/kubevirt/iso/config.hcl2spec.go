@@ -82,6 +82,8 @@ type FlatConfig struct {
 	Namespace                 *string           `mapstructure:"namespace" required:"true" cty:"namespace" hcl:"namespace"`
 	IsoVolumeName             *string           `mapstructure:"iso_volume_name" required:"true" cty:"iso_volume_name" hcl:"iso_volume_name"`
 	DiskSize                  *string           `mapstructure:"disk_size" required:"true" cty:"disk_size" hcl:"disk_size"`
+	AccessMode                *string           `mapstructure:"access_mode" required:"false" cty:"access_mode" hcl:"access_mode"`
+	VolumeMode                *string           `mapstructure:"volume_mode" required:"false" cty:"volume_mode" hcl:"volume_mode"`
 	InstanceType              *string           `mapstructure:"instance_type" required:"true" cty:"instance_type" hcl:"instance_type"`
 	InstanceTypeKind          *string           `mapstructure:"instance_type_kind" required:"false" cty:"instance_type_kind" hcl:"instance_type_kind"`
 	Preference                *string           `mapstructure:"preference" required:"true" cty:"preference" hcl:"preference"`
@@ -184,6 +186,8 @@ func (*FlatConfig) HCL2Spec() map[string]hcldec.Spec {
 		"namespace":                    &hcldec.AttrSpec{Name: "namespace", Type: cty.String, Required: false},
 		"iso_volume_name":              &hcldec.AttrSpec{Name: "iso_volume_name", Type: cty.String, Required: false},
 		"disk_size":                    &hcldec.AttrSpec{Name: "disk_size", Type: cty.String, Required: false},
+		"access_mode":                  &hcldec.AttrSpec{Name: "access_mode", Type: cty.String, Required: false},
+		"volume_mode":                  &hcldec.AttrSpec{Name: "volume_mode", Type: cty.String, Required: false},
 		"instance_type":                &hcldec.AttrSpec{Name: "instance_type", Type: cty.String, Required: false},
 		"instance_type_kind":           &hcldec.AttrSpec{Name: "instance_type_kind", Type: cty.String, Required: false},
 		"preference":                   &hcldec.AttrSpec{Name: "preference", Type: cty.String, Required: false},

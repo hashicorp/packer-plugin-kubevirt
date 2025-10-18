@@ -34,7 +34,9 @@ func virtualMachine(
 	osType string,
 	networks []Network,
 	mediaLabel string,
-	virtioContainer string) *v1.VirtualMachine {
+	virtioContainer string,
+	accessMode string,
+	volumeMode string) *v1.VirtualMachine {
 
 	vmNetworks := make([]v1.Network, len(networks))
 	vmInterfaces := make([]v1.Interface, len(networks))
@@ -50,6 +52,8 @@ func virtualMachine(
 	for i, n := range networks {
 		vmNetworks[i], vmInterfaces[i] = convertToNetwork(n)
 	}
+
+	volModeType := convertVolumeMode(volumeMode)
 
 	return &v1.VirtualMachine{
 		TypeMeta: metav1.TypeMeta{
@@ -81,7 +85,8 @@ func virtualMachine(
 									corev1.ResourceName(corev1.ResourceStorage): resource.MustParse(diskSize),
 								},
 							},
-							AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+							AccessModes: convertAccessMode(accessMode),
+							VolumeMode:  &volModeType,
 						},
 						Source: &cdiv1.DataVolumeSource{
 							Blank: &cdiv1.DataVolumeBlankImage{},
@@ -105,7 +110,9 @@ func virtualMachine(
 	}
 }
 
-func cloneVolume(volname, vmname, namespace, diskSize string) *cdiv1.DataVolume {
+func cloneVolume(volname, vmname, namespace, diskSize, accessMode, volumeMode string) *cdiv1.DataVolume {
+	volModeType := convertVolumeMode(volumeMode)
+
 	return &cdiv1.DataVolume{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: cdiv1.CDIGroupVersionKind.GroupVersion().String(),
@@ -127,7 +134,8 @@ func cloneVolume(volname, vmname, namespace, diskSize string) *cdiv1.DataVolume 
 						corev1.ResourceName(corev1.ResourceStorage): resource.MustParse(diskSize),
 					},
 				},
-				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+				AccessModes: convertAccessMode(accessMode),
+				VolumeMode:  &volModeType,
 			},
 		},
 	}
@@ -299,4 +307,26 @@ func convertToNetwork(n Network) (v1.Network, v1.Interface) {
 		vmInterface.InterfaceBindingMethod.Bridge = &v1.InterfaceBridge{}
 	}
 	return vmNetwork, vmInterface
+}
+
+func convertAccessMode(accessMode string) []corev1.PersistentVolumeAccessMode {
+	var mode corev1.PersistentVolumeAccessMode
+	switch accessMode {
+	case "", "ReadWriteOnce":
+		mode = corev1.ReadWriteOnce
+	case "ReadWriteMany":
+		mode = corev1.ReadWriteMany
+	}
+	return []corev1.PersistentVolumeAccessMode{mode}
+}
+
+func convertVolumeMode(volumeMode string) corev1.PersistentVolumeMode {
+	var mode corev1.PersistentVolumeMode
+	switch volumeMode {
+	case "", "Filesystem":
+		mode = corev1.PersistentVolumeFilesystem
+	case "Block":
+		mode = corev1.PersistentVolumeBlock
+	}
+	return mode
 }

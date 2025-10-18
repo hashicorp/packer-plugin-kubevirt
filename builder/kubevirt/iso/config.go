@@ -86,6 +86,14 @@ type Config struct {
 	IsoVolumeName string `mapstructure:"iso_volume_name" required:"true"`
 	// DiskSize is the size of the root disk to of the temporary VM.
 	DiskSize string `mapstructure:"disk_size" required:"true"`
+	// AccessMode sets the Kubernetes access mode used for persistent storage.
+	// Valid values are `ReadWriteOnce` and `ReadWriteMany`.
+	// Defaults to `ReadWriteOnce`.
+	AccessMode string `mapstructure:"access_mode" required:"false"`
+	// VolumeMode sets the Kubernetes volume mode used for persistent storage.
+	// Valid values are `Filesystem` and `Block`.
+	// Defaults to `Filesystem`.
+	VolumeMode string `mapstructure:"volume_mode" required:"false"`
 	// InstanceType is the name of the InstanceType resource to use in the temporary VM.
 	// The value specified here will be persisted to the generated DataSource as an image
 	// default.
@@ -185,6 +193,20 @@ func (c *Config) Prepare(raws ...interface{}) ([]string, error) {
 
 	if c.VirtIOContainer == "" {
 		c.VirtIOContainer = "quay.io/kubevirt/virtio-container-disk:v1.6.2"
+	}
+
+	switch c.AccessMode {
+	case "", "ReadWriteOnce", "ReadWriteMany":
+	default:
+		err = fmt.Errorf("invalid AccessMode provided, %s is not a supported option", c.AccessMode)
+		errs = packersdk.MultiErrorAppend(errs, err)
+	}
+
+	switch c.VolumeMode {
+	case "", "Filesystem", "Block":
+	default:
+		err = fmt.Errorf("invalid VolumeMode provided, %s is not a supported option", c.VolumeMode)
+		errs = packersdk.MultiErrorAppend(errs, err)
 	}
 
 	if len(errs.Errors) > 0 {

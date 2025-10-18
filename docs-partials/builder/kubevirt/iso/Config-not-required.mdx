@@ -4,6 +4,14 @@
   it will default to the same value as the Name. VMName is also used as
   the base for naming other temporary resources such as the ConfigMap.
 
+- `access_mode` (string) - AccessMode sets the Kubernetes access mode used for persistent storage.
+  Valid values are `ReadWriteOnce` and `ReadWriteMany`.
+  Defaults to `ReadWriteOnce`.
+
+- `volume_mode` (string) - VolumeMode sets the Kubernetes volume mode used for persistent storage.
+  Valid values are `Filesystem` and `Block`.
+  Defaults to `Filesystem`.
+
 - `instance_type_kind` (string) - InstanceTypeKind is the kind of the InstanceType resource to use in the temporary VM.
   Other supported value is "virtualmachineclusterinstancetype".
 
