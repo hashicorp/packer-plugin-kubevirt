@@ -83,7 +83,7 @@ type FlatConfig struct {
 	MediaFiles                []string          `mapstructure:"media_files" required:"false" cty:"media_files" hcl:"media_files"`
 	BootCommand               []string          `mapstructure:"boot_command" required:"false" cty:"boot_command" hcl:"boot_command"`
 	BootWait                  *string           `mapstructure:"boot_wait" required:"false" cty:"boot_wait" hcl:"boot_wait"`
-	InstallationWaitTimeout   *string           `mapstructure:"installation_wait_timeout" required:"true" cty:"installation_wait_timeout" hcl:"installation_wait_timeout"`
+	InstallationWaitTimeout   *string           `mapstructure:"installation_wait_timeout" required:"false" cty:"installation_wait_timeout" hcl:"installation_wait_timeout"`
 	SSHLocalPort              *int              `mapstructure:"ssh_local_port" required:"false" cty:"ssh_local_port" hcl:"ssh_local_port"`
 	SSHRemotePort             *int              `mapstructure:"ssh_remote_port" required:"false" undocumented:"true" cty:"ssh_remote_port" hcl:"ssh_remote_port"`
 	WinRMLocalPort            *int              `mapstructure:"winrm_local_port" required:"false" cty:"winrm_local_port" hcl:"winrm_local_port"`

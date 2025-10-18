@@ -104,7 +104,7 @@ type Config struct {
 	// This is useful if the VM takes some time to boot and be ready to accept keystrokes.
 	BootWait time.Duration `mapstructure:"boot_wait" required:"false"`
 	// InstallationWaitTimeout is the amount of time to wait for the installation to be completed.
-	InstallationWaitTimeout time.Duration `mapstructure:"installation_wait_timeout" required:"true"`
+	InstallationWaitTimeout time.Duration `mapstructure:"installation_wait_timeout" required:"false"`
 	// SSHLocalPort is the local port to use to connect via SSH.
 	SSHLocalPort int `mapstructure:"ssh_local_port" required:"false"`
 	// SSHRemotePort is the remote port to use to connect via SSH.

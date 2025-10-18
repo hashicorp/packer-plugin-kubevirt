@@ -54,8 +54,6 @@ build {
 
 - `preference` (string) - Preference is the name of the Preference resource to use in the temporary VM.
 
-- `installation_wait_timeout` (duration string | ex: "1h5m2s") - InstallationWaitTimeout is the amount of time to wait for the installation to be completed.
-
 <!-- End of code generated from the comments of the Config struct in builder/kubevirt/iso/config.go; -->
 
 
@@ -82,6 +80,8 @@ build {
 
 - `boot_wait` (duration string | ex: "1h5m2s") - BootWait is the amount of time to wait before sending the boot command.
   This is useful if the VM takes some time to boot and be ready to accept keystrokes.
+
+- `installation_wait_timeout` (duration string | ex: "1h5m2s") - InstallationWaitTimeout is the amount of time to wait for the installation to be completed.
 
 - `ssh_local_port` (int) - SSHLocalPort is the local port to use to connect via SSH.
 
