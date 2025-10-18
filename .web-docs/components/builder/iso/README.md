@@ -35,7 +35,9 @@ build {
 
 ## KubeVirt-ISO Builder Configuration Reference
 
-### Required Configuration
+### General Configuration
+
+**Required**:
 
 <!-- Code generated from the comments of the Config struct in builder/kubevirt/iso/config.go; DO NOT EDIT MANUALLY -->
 
@@ -51,13 +53,17 @@ build {
 - `disk_size` (string) - DiskSize is the size of the root disk to of the temporary VM.
 
 - `instance_type` (string) - InstanceType is the name of the InstanceType resource to use in the temporary VM.
+  The value specified here will be persisted to the generated DataSource as an image
+  default.
 
 - `preference` (string) - Preference is the name of the Preference resource to use in the temporary VM.
+  The value specified here will be persisted to the generated DataSource as an image
+  default.
 
 <!-- End of code generated from the comments of the Config struct in builder/kubevirt/iso/config.go; -->
 
 
-### Not Required Configuration
+**Optional**:
 
 <!-- Code generated from the comments of the Config struct in builder/kubevirt/iso/config.go; DO NOT EDIT MANUALLY -->
 

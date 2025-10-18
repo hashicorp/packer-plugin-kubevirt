@@ -87,11 +87,15 @@ type Config struct {
 	// DiskSize is the size of the root disk to of the temporary VM.
 	DiskSize string `mapstructure:"disk_size" required:"true"`
 	// InstanceType is the name of the InstanceType resource to use in the temporary VM.
+	// The value specified here will be persisted to the generated DataSource as an image
+	// default.
 	InstanceType string `mapstructure:"instance_type" required:"true"`
 	// InstanceTypeKind is the kind of the InstanceType resource to use in the temporary VM.
 	// Other supported value is "virtualmachineclusterinstancetype".
 	InstanceTypeKind string `mapstructure:"instance_type_kind" required:"false"`
 	// Preference is the name of the Preference resource to use in the temporary VM.
+	// The value specified here will be persisted to the generated DataSource as an image
+	// default.
 	Preference string `mapstructure:"preference" required:"true"`
 	// PreferenceKind is the kind of the Preference resource to use in the temporary VM.
 	// Other supported value is "virtualmachineclusterpreference".
