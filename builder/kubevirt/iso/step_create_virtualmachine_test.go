@@ -35,6 +35,7 @@ var _ = Describe("StepCreateVirtualMachine", func() {
 	)
 
 	var (
+		action     multistep.StepAction
 		ctrl       *gomock.Controller
 		kubeClient *fakek8sclient.Clientset
 		cdiClient  *fakecdiclient.Clientset
@@ -44,7 +45,7 @@ var _ = Describe("StepCreateVirtualMachine", func() {
 		step       *iso.StepCreateVirtualMachine
 	)
 
-	BeforeEach(func() {
+	JustBeforeEach(func() {
 		ctrl = gomock.NewController(GinkgoT())
 
 		uiErr := &strings.Builder{}
@@ -71,7 +72,10 @@ var _ = Describe("StepCreateVirtualMachine", func() {
 		kubecli.MockKubevirtClientInstance.EXPECT().CdiClient().Return(cdiClient).AnyTimes()
 
 		virtClient, _ = kubecli.GetKubevirtClientFromClientConfig(nil)
+		step.Client = virtClient
+	})
 
+	BeforeEach(func() {
 		step = &iso.StepCreateVirtualMachine{
 			Config: iso.Config{
 				VMName:              name,
@@ -89,7 +93,6 @@ var _ = Describe("StepCreateVirtualMachine", func() {
 				},
 				VirtIOContainer: "registry.example.com/virtio",
 			},
-			Client: virtClient,
 		}
 	})
 
@@ -98,15 +101,18 @@ var _ = Describe("StepCreateVirtualMachine", func() {
 	})
 
 	Context("Run", func() {
-		It("halts when OS type is unsupported", func() {
-			step.Config.OperatingSystemType = "bsd"
-			action := step.Run(context.Background(), state)
-			Expect(action).To(Equal(multistep.ActionHalt))
-		})
+		var (
+			err        error
+			vm         *v1.VirtualMachine
+			readyState bool
+		)
 
-		It("continues when VM is created and becomes Ready", func() {
+		JustBeforeEach(func() {
+			var ctx context.Context
+			var cancel func()
+
 			// Let Run create the VM, then mark it Ready
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel = context.WithCancel(context.Background())
 			defer cancel()
 
 			// Watch for VM creation and patch Ready status
@@ -114,40 +120,39 @@ var _ = Describe("StepCreateVirtualMachine", func() {
 				create := action.(k8stesting.CreateAction)
 				obj := create.GetObject().(*v1.VirtualMachine)
 				// Simulate that VM is created and becomes Ready
-				obj.Status.Ready = true
+				obj.Status.Ready = readyState
 				return false, obj, nil
 			})
 
-			action := step.Run(ctx, state)
+			if readyState == false {
+				cancel()
+			}
+
+			action = step.Run(ctx, state)
+			vm, err = vmClient.KubevirtV1().VirtualMachines(namespace).Get(context.Background(), name, metav1.GetOptions{})
+		})
+
+		BeforeEach(func() {
+			readyState = true
+		})
+
+		When("the OS type is unsupported", func() {
+			BeforeEach(func() {
+				step.Config.OperatingSystemType = "bsd"
+			})
+
+			It("halts when OS type is unsupported", func() {
+				Expect(action).To(Equal(multistep.ActionHalt))
+			})
+		})
+
+		It("continues when VM is created and becomes Ready", func() {
 			Expect(action).To(Equal(multistep.ActionContinue))
 		})
 
 		When("creating a Linux VM", func() {
-			var (
-				ctx context.Context
-				vm  *v1.VirtualMachine
-			)
-
-			BeforeEach(func() {
-				var cancel func()
-				var err error
-
-				// Let Run create the VM, then mark it Ready
-				ctx, cancel = context.WithCancel(context.Background())
-				defer cancel()
-
-				// Watch for VM creation and patch Ready status
-				vmClient.Fake.PrependReactor("create", "virtualmachines", func(action k8stesting.Action) (bool, runtime.Object, error) {
-					create := action.(k8stesting.CreateAction)
-					obj := create.GetObject().(*v1.VirtualMachine)
-					// Simulate that VM is created and becomes Ready
-					obj.Status.Ready = true
-					return false, obj, nil
-				})
-
-				action := step.Run(ctx, state)
+			JustBeforeEach(func() {
 				Expect(action).To(Equal(multistep.ActionContinue))
-				vm, err = vmClient.KubevirtV1().VirtualMachines(namespace).Get(context.Background(), name, metav1.GetOptions{})
 				Expect(err).NotTo(HaveOccurred())
 			})
 
@@ -216,34 +221,8 @@ var _ = Describe("StepCreateVirtualMachine", func() {
 		})
 
 		When("creating a Windows VM", func() {
-			var (
-				ctx context.Context
-				vm  *v1.VirtualMachine
-			)
-
 			BeforeEach(func() {
-				var cancel func()
-				var err error
-
-				// Let Run create the VM, then mark it Ready
-				ctx, cancel = context.WithCancel(context.Background())
-				defer cancel()
-
-				// Watch for VM creation and patch Ready status
-				vmClient.Fake.PrependReactor("create", "virtualmachines", func(action k8stesting.Action) (bool, runtime.Object, error) {
-					create := action.(k8stesting.CreateAction)
-					obj := create.GetObject().(*v1.VirtualMachine)
-					// Simulate that VM is created and becomes Ready
-					obj.Status.Ready = true
-					return false, obj, nil
-				})
-
 				step.Config.OperatingSystemType = "windows"
-
-				action := step.Run(ctx, state)
-				Expect(action).To(Equal(multistep.ActionContinue))
-				vm, err = vmClient.KubevirtV1().VirtualMachines(namespace).Get(context.Background(), name, metav1.GetOptions{})
-				Expect(err).NotTo(HaveOccurred())
 			})
 
 			It("configures the virtio container disk correctly", func() {
@@ -273,6 +252,52 @@ var _ = Describe("StepCreateVirtualMachine", func() {
 			})
 		})
 
+		When("setting the access mode to ReadWriteOnce", func() {
+			BeforeEach(func() {
+				step.Config.AccessMode = "ReadWriteOnce"
+			})
+
+			It("correctly sets the access mode", func() {
+				Expect(vm.Spec.DataVolumeTemplates[0].Spec.PVC.AccessModes[0]).To(Equal(corev1.ReadWriteOnce))
+			})
+		})
+
+		When("setting the access mode to ReadWriteMany", func() {
+			BeforeEach(func() {
+				step.Config.AccessMode = "ReadWriteMany"
+			})
+
+			It("correctly sets the access mode", func() {
+				Expect(vm.Spec.DataVolumeTemplates[0].Spec.PVC.AccessModes[0]).To(Equal(corev1.ReadWriteMany))
+			})
+		})
+
+		When("volume_mode is not configured", func() {
+			It("uses Filesystem as the default", func() {
+				Expect(vm.Spec.DataVolumeTemplates[0].Spec.PVC.VolumeMode).To(HaveValue(Equal(corev1.PersistentVolumeFilesystem)))
+			})
+		})
+
+		When("volume_mode=Filesystem", func() {
+			BeforeEach(func() {
+				step.Config.VolumeMode = "Filesystem"
+			})
+
+			It("correctly configures the volume mode", func() {
+				Expect(vm.Spec.DataVolumeTemplates[0].Spec.PVC.VolumeMode).To(HaveValue(Equal(corev1.PersistentVolumeFilesystem)))
+			})
+		})
+
+		When("volume_mode=Block", func() {
+			BeforeEach(func() {
+				step.Config.VolumeMode = "Block"
+			})
+
+			It("correctly configures the volume mode", func() {
+				Expect(vm.Spec.DataVolumeTemplates[0].Spec.PVC.VolumeMode).To(HaveValue(Equal(corev1.PersistentVolumeBlock)))
+			})
+		})
+
 		It("halts when VM creation fails", func() {
 			// Inject error into fake client
 			vmClient.Fake.PrependReactor("create", "virtualmachines", func(action k8stesting.Action) (bool, runtime.Object, error) {
@@ -283,23 +308,14 @@ var _ = Describe("StepCreateVirtualMachine", func() {
 			Expect(action).To(Equal(multistep.ActionHalt))
 		})
 
-		It("halts when VM never becomes Ready", func() {
-			_, err := vmClient.KubevirtV1().VirtualMachines(namespace).Create(context.Background(),
-				&v1.VirtualMachine{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      name,
-						Namespace: namespace,
-					},
-					Status: v1.VirtualMachineStatus{Ready: false},
-				},
-				metav1.CreateOptions{})
-			Expect(err).NotTo(HaveOccurred())
+		When("the VM never becomes ready", func() {
+			BeforeEach(func() {
+				readyState = false
+			})
 
-			ctx, cancel := context.WithCancel(context.Background())
-			cancel()
-
-			action := step.Run(ctx, state)
-			Expect(action).To(Equal(multistep.ActionHalt))
+			It("halts", func() {
+				Expect(action).To(Equal(multistep.ActionHalt))
+			})
 		})
 	})
 
