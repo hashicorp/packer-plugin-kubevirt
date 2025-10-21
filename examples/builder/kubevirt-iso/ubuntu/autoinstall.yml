@@ -1,0 +1,26 @@
+#cloud-config
+autoinstall:
+  version: 1
+  locale: "en_US.UTF-8"
+  keyboard:
+      layout: us
+  source:
+    id: ubuntu-server-minimal
+  storage:
+    version: 2
+    layout:
+      name: direct
+  identity:
+    username: 'user'
+    password: '$6$HntQie2hPMEw5F7R$2KhFbxmZfLLd6pIYgssEIdBsvwcn5NYEqI6fG.GGYn3FJk3De4cHZXzPxqnvVIK6k/zi92XqIwNecLc6oUff./' 
+    hostname: ubuntu2404
+  ssh:
+    allow-pw: true
+    install-server: true
+    authorized-keys: []
+  packages:
+    - qemu-guest-agent
+  kernel:
+    flavor: generic
+  timezone: 'UTC'
+  shutdown: reboot
