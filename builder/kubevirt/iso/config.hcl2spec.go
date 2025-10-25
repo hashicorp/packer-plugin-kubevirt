@@ -77,7 +77,8 @@ type FlatConfig struct {
 	ForwardingPort            *int              `mapstructure:"forwarding_port" required:"false" cty:"forwarding_port" hcl:"forwarding_port"`
 	AgentWaitTimeout          *string           `mapstructure:"agent_wait_timeout" required:"false" cty:"agent_wait_timeout" hcl:"agent_wait_timeout"`
 	KubeConfig                *string           `mapstructure:"kube_config" required:"true" cty:"kube_config" hcl:"kube_config"`
-	Name                      *string           `mapstructure:"name" required:"true" cty:"name" hcl:"name"`
+	Name                      *string           `mapstructure:"name" required:"false" undocumented:"true" cty:"name" hcl:"name"`
+	TemplateName              *string           `mapstructure:"template_name" required:"true" cty:"template_name" hcl:"template_name"`
 	VMName                    *string           `mapstructure:"vm_name" required:"false" cty:"vm_name" hcl:"vm_name"`
 	Namespace                 *string           `mapstructure:"namespace" required:"true" cty:"namespace" hcl:"namespace"`
 	IsoVolumeName             *string           `mapstructure:"iso_volume_name" required:"true" cty:"iso_volume_name" hcl:"iso_volume_name"`
@@ -182,6 +183,7 @@ func (*FlatConfig) HCL2Spec() map[string]hcldec.Spec {
 		"agent_wait_timeout":           &hcldec.AttrSpec{Name: "agent_wait_timeout", Type: cty.String, Required: false},
 		"kube_config":                  &hcldec.AttrSpec{Name: "kube_config", Type: cty.String, Required: false},
 		"name":                         &hcldec.AttrSpec{Name: "name", Type: cty.String, Required: false},
+		"template_name":                &hcldec.AttrSpec{Name: "template_name", Type: cty.String, Required: false},
 		"vm_name":                      &hcldec.AttrSpec{Name: "vm_name", Type: cty.String, Required: false},
 		"namespace":                    &hcldec.AttrSpec{Name: "namespace", Type: cty.String, Required: false},
 		"iso_volume_name":              &hcldec.AttrSpec{Name: "iso_volume_name", Type: cty.String, Required: false},

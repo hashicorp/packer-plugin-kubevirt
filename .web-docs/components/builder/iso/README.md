@@ -43,7 +43,7 @@ build {
 
 - `kube_config` (string) - KubeConfig is the path to the kubeconfig file.
 
-- `name` (string) - Name is the name of the DataSource resulting from the built image.
+- `template_name` (string) - TemplateName is the name of the DataSource resulting from the built image.
 
 - `namespace` (string) - Namespace is the namespace in which to create the VM image.
 

@@ -74,7 +74,10 @@ type Config struct {
 	// KubeConfig is the path to the kubeconfig file.
 	KubeConfig string `mapstructure:"kube_config" required:"true"`
 	// Name is the name of the DataSource resulting from the built image.
-	Name string `mapstructure:"name" required:"true"`
+	// This is deprecated in favor of TemplateName
+	Name string `mapstructure:"name" required:"false" undocumented:"true"`
+	// TemplateName is the name of the DataSource resulting from the built image.
+	TemplateName string `mapstructure:"template_name" required:"true"`
 	// VMName is the name of the temporary VM instance. If not specified,
 	// it will default to the same value as the Name. VMName is also used as
 	// the base for naming other temporary resources such as the ConfigMap.
@@ -186,9 +189,14 @@ func (c *Config) Prepare(raws ...interface{}) ([]string, error) {
 		}
 	}
 
+	// Default TemplateName to "Name", if provided
+	if c.TemplateName == "" {
+		c.TemplateName = c.Name
+	}
+
 	// Default the VMName to the DataSource name, if not otherwise specified:
 	if c.VMName == "" {
-		c.VMName = c.Name
+		c.VMName = c.TemplateName
 	}
 
 	if c.VirtIOContainer == "" {

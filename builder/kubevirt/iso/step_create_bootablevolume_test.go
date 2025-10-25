@@ -65,7 +65,7 @@ var _ = Describe("StepCreateBootableVolume", func() {
 	BeforeEach(func() {
 		step = &iso.StepCreateBootableVolume{
 			Config: iso.Config{
-				Name:         name,
+				TemplateName: name,
 				VMName:       vmname,
 				Namespace:    namespace,
 				DiskSize:     "10Gi",
