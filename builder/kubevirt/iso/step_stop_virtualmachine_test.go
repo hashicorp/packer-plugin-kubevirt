@@ -67,7 +67,7 @@ var _ = Describe("StepStopVirtualMachine", func() {
 
 		step = &iso.StepStopVirtualMachine{
 			Config: iso.Config{
-				Name:      name,
+				VMName:    name,
 				Namespace: namespace,
 			},
 			Client: virtClient,

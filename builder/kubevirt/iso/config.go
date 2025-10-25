@@ -11,7 +11,10 @@ import (
 	"time"
 
 	"github.com/hashicorp/packer-plugin-sdk/common"
+	"github.com/hashicorp/packer-plugin-sdk/communicator"
+	packersdk "github.com/hashicorp/packer-plugin-sdk/packer"
 	"github.com/hashicorp/packer-plugin-sdk/template/config"
+	"github.com/hashicorp/packer-plugin-sdk/template/interpolate"
 )
 
 // Network represents a network type and a resource that should be connected to the VM.
@@ -62,10 +65,23 @@ type MultusNetwork struct {
 type Config struct {
 	common.PackerConfig `mapstructure:",squash"`
 
+	Comm               communicator.Config `mapstructure:",squash"`
+	Media              MediaConfig         `mapstructure:",squash"`
+	WaitIpConfig       `mapstructure:",squash"`
+	PortForwardConfig  `mapstructure:",squash"`
+	WaitForAgentConfig `mapstructure:",squash"`
+
 	// KubeConfig is the path to the kubeconfig file.
 	KubeConfig string `mapstructure:"kube_config" required:"true"`
-	// Name is the name of the VM image.
-	Name string `mapstructure:"name" required:"true"`
+	// Name is the name of the DataSource resulting from the built image.
+	// This is deprecated in favor of TemplateName
+	Name string `mapstructure:"name" required:"false" undocumented:"true"`
+	// TemplateName is the name of the DataSource resulting from the built image.
+	TemplateName string `mapstructure:"template_name" required:"true"`
+	// VMName is the name of the temporary VM instance. If not specified,
+	// it will default to the same value as the Name. VMName is also used as
+	// the base for naming other temporary resources such as the ConfigMap.
+	VMName string `mapstructure:"vm_name" required:"false"`
 	// Namespace is the namespace in which to create the VM image.
 	Namespace string `mapstructure:"namespace" required:"true"`
 	// ISO Volume Name is the name of the DataVolume resource that contains the installation ISO.
@@ -73,12 +89,24 @@ type Config struct {
 	IsoVolumeName string `mapstructure:"iso_volume_name" required:"true"`
 	// DiskSize is the size of the root disk to of the temporary VM.
 	DiskSize string `mapstructure:"disk_size" required:"true"`
+	// AccessMode sets the Kubernetes access mode used for persistent storage.
+	// Valid values are `ReadWriteOnce` and `ReadWriteMany`.
+	// Defaults to `ReadWriteOnce`.
+	AccessMode string `mapstructure:"access_mode" required:"false"`
+	// VolumeMode sets the Kubernetes volume mode used for persistent storage.
+	// Valid values are `Filesystem` and `Block`.
+	// Defaults to `Filesystem`.
+	VolumeMode string `mapstructure:"volume_mode" required:"false"`
 	// InstanceType is the name of the InstanceType resource to use in the temporary VM.
+	// The value specified here will be persisted to the generated DataSource as an image
+	// default.
 	InstanceType string `mapstructure:"instance_type" required:"true"`
 	// InstanceTypeKind is the kind of the InstanceType resource to use in the temporary VM.
 	// Other supported value is "virtualmachineclusterinstancetype".
 	InstanceTypeKind string `mapstructure:"instance_type_kind" required:"false"`
 	// Preference is the name of the Preference resource to use in the temporary VM.
+	// The value specified here will be persisted to the generated DataSource as an image
+	// default.
 	Preference string `mapstructure:"preference" required:"true"`
 	// PreferenceKind is the kind of the Preference resource to use in the temporary VM.
 	// Other supported value is "virtualmachineclusterpreference".
@@ -89,8 +117,6 @@ type Config struct {
 	// Networks is a list of networks to attach to the temporary VM.
 	// If no networks are specified, a single pod network will be used.
 	Networks []Network `mapstructure:"networks" required:"false"`
-	// MediaFiles is a path list of files to be copied and used during the ISO installation.
-	MediaFiles []string `mapstructure:"media_files" required:"false"`
 	// BootCommand is a list of strings that represent the keystrokes to be sent to the VM console
 	// to automate the installation via a new VNC connection.
 	BootCommand []string `mapstructure:"boot_command" required:"false"`
@@ -98,34 +124,24 @@ type Config struct {
 	// This is useful if the VM takes some time to boot and be ready to accept keystrokes.
 	BootWait time.Duration `mapstructure:"boot_wait" required:"false"`
 	// InstallationWaitTimeout is the amount of time to wait for the installation to be completed.
-	InstallationWaitTimeout time.Duration `mapstructure:"installation_wait_timeout" required:"true"`
-	// Communicator is the type of communicator to use to connect to the VM.
-	// Supported values are "ssh" and "winrm".
-	Communicator string `mapstructure:"communicator" required:"false"`
-	// SSHHost is the hostname or IP address to use to connect via SSH.
-	SSHHost string `mapstructure:"ssh_host" required:"false"`
+	InstallationWaitTimeout time.Duration `mapstructure:"installation_wait_timeout" required:"false"`
 	// SSHLocalPort is the local port to use to connect via SSH.
 	SSHLocalPort int `mapstructure:"ssh_local_port" required:"false"`
 	// SSHRemotePort is the remote port to use to connect via SSH.
-	SSHRemotePort int `mapstructure:"ssh_remote_port" required:"false"`
-	// SSHUsername is the username to use to connect via SSH.
-	SSHUsername string `mapstructure:"ssh_username" required:"false"`
-	// SSHPassword is the password to use to connect via SSH.
-	SSHPassword string `mapstructure:"ssh_password" required:"false"`
-	// SSHWaitTimeout is the amount of time to wait for the SSH service to be available.
-	SSHWaitTimeout time.Duration `mapstructure:"ssh_wait_timeout" required:"false"`
-	// WinRMHost is the hostname or IP address to use to connect via WinRM.
-	WinRMHost string `mapstructure:"winrm_host" required:"false"`
+	// This has been deprecated in favor of ssh_port.
+	SSHRemotePort int `mapstructure:"ssh_remote_port" required:"false" undocumented:"true"`
+	// VirtIOContainer is the location of the VirtIO Container Image containing
+	// the Windows VirtIO drivers. It will be mounted as a CD-ROM on Windows
+	// builds.
+	VirtIOContainer string `mapstructure:"virtio_container" required:"false"`
 	// WinRMLocalPort is the local port to use to connect via WinRM.
 	WinRMLocalPort int `mapstructure:"winrm_local_port" required:"false"`
 	// WinRMRemotePort is the remote port to use to connect via WinRM.
-	WinRMRemotePort int `mapstructure:"winrm_remote_port" required:"false"`
-	// WinRMUsername is the username to use to connect via WinRM.
-	WinRMUsername string `mapstructure:"winrm_username" required:"false"`
-	// WinRMPassword is the password to use to connect via WinRM.
-	WinRMPassword string `mapstructure:"winrm_password" required:"false"`
+	// This has been deprecated in favor of WinRMPort
+	WinRMRemotePort int `mapstructure:"winrm_remote_port" required:"false" undocumented:"true"`
 	// WinRMWaitTimeout is the amount of time to wait for the WinRM service to be available.
-	WinRMWaitTimeout time.Duration `mapstructure:"winrm_wait_timeout" required:"false"`
+	// This has been deprecated in favor of WinRMTimeout
+	WinRMWaitTimeout time.Duration `mapstructure:"winrm_wait_timeout" required:"false" undocumented:"true"`
 
 	// KeepVM indicates whether to keep the temporary VM after the image has been created.
 	// If false, the VM and all its resources will be deleted after the image is created.
@@ -136,21 +152,111 @@ type Config struct {
 	// However, it is recommended to set this to false in production environments to avoid
 	// resource leaks.
 	KeepVM bool `mapstructure:"keep_vm" required:"false"`
+
+	ctx interpolate.Context
 }
 
 func (c *Config) Prepare(raws ...interface{}) ([]string, error) {
 	err := config.Decode(c, &config.DecodeOpts{
-		PluginType:  "builder.kubevirt.iso",
-		Interpolate: true,
+		PluginType:         "builder.kubevirt.iso",
+		Interpolate:        true,
+		InterpolateContext: &c.ctx,
 	}, raws...)
 	if err != nil {
 		return nil, err
 	}
 
+	warnings := make([]string, 0)
+	errs := new(packersdk.MultiError)
+
+	errs = packersdk.MultiErrorAppend(errs, c.WaitIpConfig.Prepare()...)
+	errs = packersdk.MultiErrorAppend(errs, c.Media.Prepare()...)
+	errs = packersdk.MultiErrorAppend(errs, c.Comm.Prepare(&c.ctx)...)
+
 	for _, n := range c.Networks {
 		if n.Pod != nil && n.Multus != nil {
-			return nil, fmt.Errorf("network %q: only one of pod or multus can be defined", n.Name)
+			errs = packersdk.MultiErrorAppend(errs, fmt.Errorf("network %q: only one of pod or multus can be defined", n.Name))
+		}
+		if n.Pod != nil && c.Comm.Host() == "" && c.DisableForwarding {
+			warnings = append(warnings, "Direct connections (direct_connect=true) likely will not work when using a pod network")
 		}
 	}
-	return nil, err
+
+	// Also check for no networks, which defaults to using the pod network:
+	if len(c.Networks) == 0 {
+		if c.Comm.Host() == "" && c.DisableForwarding {
+			warnings = append(warnings, "Direct connections (direct_connect=true) likely will not work when using a pod network")
+		}
+	}
+
+	// Default TemplateName to "Name", if provided
+	if c.TemplateName == "" {
+		c.TemplateName = c.Name
+	}
+
+	// Default the VMName to the DataSource name, if not otherwise specified:
+	if c.VMName == "" {
+		c.VMName = c.TemplateName
+	}
+
+	if c.VirtIOContainer == "" {
+		c.VirtIOContainer = "quay.io/kubevirt/virtio-container-disk:v1.6.2"
+	}
+
+	switch c.AccessMode {
+	case "", "ReadWriteOnce", "ReadWriteMany":
+	default:
+		err = fmt.Errorf("invalid AccessMode provided, %s is not a supported option", c.AccessMode)
+		errs = packersdk.MultiErrorAppend(errs, err)
+	}
+
+	switch c.VolumeMode {
+	case "", "Filesystem", "Block":
+	default:
+		err = fmt.Errorf("invalid VolumeMode provided, %s is not a supported option", c.VolumeMode)
+		errs = packersdk.MultiErrorAppend(errs, err)
+	}
+
+	if len(errs.Errors) > 0 {
+		return warnings, errs
+	}
+
+	// Remap deprecated values for backwards compatibility:
+	warnings = append(warnings, c.backwardsCompat()...)
+
+	return warnings, nil
+}
+
+func (c *Config) backwardsCompat() []string {
+	depmsg := make([]string, 0)
+
+	if c.SSHRemotePort != 0 {
+		depmsg = append(depmsg, "ssh_remote_port is deprecated - use ssh_port instead")
+		c.Comm.SSHPort = c.SSHRemotePort
+	}
+
+	if c.WinRMRemotePort != 0 {
+		depmsg = append(depmsg, "winrm_remote_port is deprecated - use winrm_port instead")
+		c.Comm.WinRMPort = c.WinRMRemotePort
+	}
+
+	if c.WinRMWaitTimeout != 0 {
+		depmsg = append(depmsg, "winrm_wait_timeout is deprecated - use winrm_timeout instead")
+		c.Comm.WinRMTimeout = c.WinRMWaitTimeout
+	}
+
+	switch c.Comm.Type {
+	case "ssh":
+		if c.SSHLocalPort > 0 {
+			depmsg = append(depmsg, "ssh_local_port is deprecated - use forwarding_port instead")
+			c.PortForwardConfig.ForwardingPort = c.SSHLocalPort
+		}
+	case "winrm":
+		if c.WinRMLocalPort > 0 {
+			depmsg = append(depmsg, "winrm_local_port is deprecated - use forwarding_port instead")
+			c.PortForwardConfig.ForwardingPort = c.WinRMLocalPort
+		}
+	}
+
+	return depmsg
 }

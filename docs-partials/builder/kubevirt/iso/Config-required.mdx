@@ -2,7 +2,7 @@
 
 - `kube_config` (string) - KubeConfig is the path to the kubeconfig file.
 
-- `name` (string) - Name is the name of the VM image.
+- `template_name` (string) - TemplateName is the name of the DataSource resulting from the built image.
 
 - `namespace` (string) - Namespace is the namespace in which to create the VM image.
 
@@ -12,9 +12,11 @@
 - `disk_size` (string) - DiskSize is the size of the root disk to of the temporary VM.
 
 - `instance_type` (string) - InstanceType is the name of the InstanceType resource to use in the temporary VM.
+  The value specified here will be persisted to the generated DataSource as an image
+  default.
 
 - `preference` (string) - Preference is the name of the Preference resource to use in the temporary VM.
-
-- `installation_wait_timeout` (duration string | ex: "1h5m2s") - InstallationWaitTimeout is the amount of time to wait for the installation to be completed.
+  The value specified here will be persisted to the generated DataSource as an image
+  default.
 
 <!-- End of code generated from the comments of the Config struct in builder/kubevirt/iso/config.go; -->

@@ -24,7 +24,7 @@ type StepCreateVirtualMachine struct {
 
 func (s *StepCreateVirtualMachine) Run(ctx context.Context, state multistep.StateBag) multistep.StepAction {
 	ui := state.Get("ui").(packer.Ui)
-	name := s.Config.Name
+	vmname := s.Config.VMName
 	namespace := s.Config.Namespace
 	isoVolumeName := s.Config.IsoVolumeName
 	diskSize := s.Config.DiskSize
@@ -34,6 +34,7 @@ func (s *StepCreateVirtualMachine) Run(ctx context.Context, state multistep.Stat
 	preferenceKind := s.Config.PreferenceKind
 	osType := s.Config.OperatingSystemType
 	networks := s.Config.Networks
+	mediaLabel := s.Config.Media.Label
 
 	if osType == "" || (osType != "linux" && osType != "windows") {
 		ui.Errorf("OS type of '%s' is not supported, set 'linux' or 'windows'.", osType)
@@ -41,7 +42,7 @@ func (s *StepCreateVirtualMachine) Run(ctx context.Context, state multistep.Stat
 	}
 
 	virtualMachine := virtualMachine(
-		name,
+		vmname,
 		isoVolumeName,
 		diskSize,
 		instanceTypeName,
@@ -49,9 +50,14 @@ func (s *StepCreateVirtualMachine) Run(ctx context.Context, state multistep.Stat
 		instanceTypeKind,
 		preferenceKind,
 		osType,
-		networks)
+		networks,
+		mediaLabel,
+		s.Config.VirtIOContainer,
+		s.Config.AccessMode,
+		s.Config.VolumeMode,
+	)
 
-	ui.Sayf("Creating a new temporary VirtualMachine (%s/%s)...", namespace, name)
+	ui.Sayf("Creating a new temporary VirtualMachine (%s/%s)...", namespace, vmname)
 
 	_, err := s.Client.VirtualMachine(namespace).Create(ctx, virtualMachine, metav1.CreateOptions{})
 	if err != nil {
@@ -67,29 +73,29 @@ func (s *StepCreateVirtualMachine) Run(ctx context.Context, state multistep.Stat
 
 func (s *StepCreateVirtualMachine) Cleanup(state multistep.StateBag) {
 	ui := state.Get("ui").(packer.Ui)
-	name := s.Config.Name
+	vmname := s.Config.VMName
 	namespace := s.Config.Namespace
 	keepVM := s.Config.KeepVM
 
 	if keepVM {
-		ui.Sayf("Keeping VirtualMachine (%s/%s).", namespace, name)
+		ui.Sayf("Keeping VirtualMachine (%s/%s).", namespace, vmname)
 		return
 	}
 
-	ui.Sayf("Deleting VirtualMachine (%s/%s)...", namespace, name)
+	ui.Sayf("Deleting VirtualMachine (%s/%s)...", namespace, vmname)
 
-	_ = s.Client.VirtualMachine(namespace).Delete(context.Background(), name, metav1.DeleteOptions{
+	_ = s.Client.VirtualMachine(namespace).Delete(context.Background(), vmname, metav1.DeleteOptions{
 		GracePeriodSeconds: ptr.To(int64(0)),
 	})
 }
 
 func (s *StepCreateVirtualMachine) waitUntilVirtualMachineReady(ctx context.Context) error {
-	name := s.Config.Name
+	vmname := s.Config.VMName
 	namespace := s.Config.Namespace
 	pollInterval := 5 * time.Second
 	pollTimeout := 3600 * time.Second
 	poller := func(ctx context.Context) (bool, error) {
-		vm, err := s.Client.VirtualMachine(namespace).Get(ctx, name, metav1.GetOptions{})
+		vm, err := s.Client.VirtualMachine(namespace).Get(ctx, vmname, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}

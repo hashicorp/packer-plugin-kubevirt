@@ -15,6 +15,17 @@ variable "kube_config" {
   default = "${env("KUBECONFIG")}"
 }
 
+local "accept_eula" {
+  # Note: To avoid License error, set the value of this variable to "true", which will
+  # set the value of "AcceptEula" to true in the resulting autounattend.xml file.
+  #
+  # By setting "AcceptEula" parameter to "true", you are agreeing to the
+  # applicable Microsoft end user license agreement(s) for each deployment
+  # or installation for the Microsoft product(s).
+  #
+  expression = false
+}
+
 source "kubevirt-iso" "windows" {
   # Kubernetes configuration
   kube_config   = var.kube_config
@@ -30,20 +41,17 @@ source "kubevirt-iso" "windows" {
   preference    = "windows.11.virtio"
   os_type       = "windows"
 
-  # Files to include in the ISO installation
+  # Files to include in the installation
   media_files = [
-    #
-    # Note: To avoid License error, set "AcceptEula" to "true" in the "autounattend.xml" file.
-    #
-    # By setting "AcceptEula" parameter to "true", you are agreeing to the
-    # applicable Microsoft end user license agreement(s) for each deployment
-    # or installation for the Microsoft product(s).
-    #
-    "./autounattend.xml",
     "./install-misc.ps1",
     "./set-network.ps1",
     "./enable-winrm.ps1"
   ]
+
+  # Interpolate the autounattend as a template file.
+  media_content = {
+    "autounattend.xml" = templatefile("./autounattend.xml.tpl", { accept_eula = local.accept_eula })
+  }
 
   # Boot process configuration
   # A set of commands to send over VNC connection
@@ -54,13 +62,10 @@ source "kubevirt-iso" "windows" {
   installation_wait_timeout = "20m"    # Timeout for installation to complete
 
   # WinRM configuration
-  communicator       = "winrm"
-  winrm_host         = "127.0.0.1"
-  winrm_local_port   = 5000
-  winrm_remote_port  = 5985
-  winrm_username     = "Administrator"
-  winrm_password     = "shadowman"
-  winrm_wait_timeout = "25m"
+  communicator   = "winrm"
+  winrm_username = "Administrator"
+  winrm_password = "shadowman"
+  winrm_timeout  = "25m"
 }
 
 build {

@@ -100,7 +100,7 @@
       </ImageInstall>
       <UserData>
         <!-- By setting this parameter to "true", you are agreeing to the applicable Microsoft end user license agreement(s) for each deployment or installation for the Microsoft product(s). -->
-        <AcceptEula>false</AcceptEula>
+        <AcceptEula>${accept_eula}</AcceptEula>
         <ProductKey>
           <Key/>
         </ProductKey>

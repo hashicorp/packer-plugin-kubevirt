@@ -1,5 +1,17 @@
 <!-- Code generated from the comments of the Config struct in builder/kubevirt/iso/config.go; DO NOT EDIT MANUALLY -->
 
+- `vm_name` (string) - VMName is the name of the temporary VM instance. If not specified,
+  it will default to the same value as the Name. VMName is also used as
+  the base for naming other temporary resources such as the ConfigMap.
+
+- `access_mode` (string) - AccessMode sets the Kubernetes access mode used for persistent storage.
+  Valid values are `ReadWriteOnce` and `ReadWriteMany`.
+  Defaults to `ReadWriteOnce`.
+
+- `volume_mode` (string) - VolumeMode sets the Kubernetes volume mode used for persistent storage.
+  Valid values are `Filesystem` and `Block`.
+  Defaults to `Filesystem`.
+
 - `instance_type_kind` (string) - InstanceTypeKind is the kind of the InstanceType resource to use in the temporary VM.
   Other supported value is "virtualmachineclusterinstancetype".
 
@@ -12,40 +24,21 @@
 - `networks` ([]Network) - Networks is a list of networks to attach to the temporary VM.
   If no networks are specified, a single pod network will be used.
 
-- `media_files` ([]string) - MediaFiles is a path list of files to be copied and used during the ISO installation.
-
 - `boot_command` ([]string) - BootCommand is a list of strings that represent the keystrokes to be sent to the VM console
   to automate the installation via a new VNC connection.
 
 - `boot_wait` (duration string | ex: "1h5m2s") - BootWait is the amount of time to wait before sending the boot command.
   This is useful if the VM takes some time to boot and be ready to accept keystrokes.
 
-- `communicator` (string) - Communicator is the type of communicator to use to connect to the VM.
-  Supported values are "ssh" and "winrm".
-
-- `ssh_host` (string) - SSHHost is the hostname or IP address to use to connect via SSH.
+- `installation_wait_timeout` (duration string | ex: "1h5m2s") - InstallationWaitTimeout is the amount of time to wait for the installation to be completed.
 
 - `ssh_local_port` (int) - SSHLocalPort is the local port to use to connect via SSH.
 
-- `ssh_remote_port` (int) - SSHRemotePort is the remote port to use to connect via SSH.
-
-- `ssh_username` (string) - SSHUsername is the username to use to connect via SSH.
-
-- `ssh_password` (string) - SSHPassword is the password to use to connect via SSH.
-
-- `ssh_wait_timeout` (duration string | ex: "1h5m2s") - SSHWaitTimeout is the amount of time to wait for the SSH service to be available.
-
-- `winrm_host` (string) - WinRMHost is the hostname or IP address to use to connect via WinRM.
+- `virtio_container` (string) - VirtIOContainer is the location of the VirtIO Container Image containing
+  the Windows VirtIO drivers. It will be mounted as a CD-ROM on Windows
+  builds.
 
 - `winrm_local_port` (int) - WinRMLocalPort is the local port to use to connect via WinRM.
-
-- `winrm_remote_port` (int) - WinRMRemotePort is the remote port to use to connect via WinRM.
-
-- `winrm_username` (string) - WinRMUsername is the username to use to connect via WinRM.
-
-- `winrm_password` (string) - WinRMPassword is the password to use to connect via WinRM.
-
-- `winrm_wait_timeout` (duration string | ex: "1h5m2s") - WinRMWaitTimeout is the amount of time to wait for the WinRM service to be available.
 
 - `keep_vm` (bool) - KeepVM indicates whether to keep the temporary VM after the image has been created.
   If false, the VM and all its resources will be deleted after the image is created.

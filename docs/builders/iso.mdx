@@ -47,13 +47,21 @@ build {
 
 ## KubeVirt-ISO Builder Configuration Reference
 
-### Required Configuration
+### General Configuration
+
+**Required**:
 
 @include 'builder/kubevirt/iso/Config-required.mdx'
 
-### Not Required Configuration
+**Optional**:
 
 @include 'builder/kubevirt/iso/Config-not-required.mdx'
+
+### User Media Configuration
+
+**Optional**:
+
+@include 'builder/kubevirt/iso/MediaConfig-not-required.mdx'
 
 ### Network Configuration
 
@@ -68,3 +76,29 @@ build {
 
 @include 'builder/kubevirt/iso/MultusNetwork.mdx'
 @include 'builder/kubevirt/iso/MultusNetwork-not-required.mdx'
+
+### Wait Configuration
+
+**Optional**:
+
+@include 'builder/kubevirt/iso/WaitForAgentConfig-not-required.mdx'
+@include 'builder/kubevirt/iso/WaitIpConfig-not-required.mdx'
+
+### Communicator Configuration
+
+**Optional**:
+
+##### Common
+
+@include 'builder/kubevirt/iso/PortForwardConfig-not-required.mdx'
+@include 'packer-plugin-sdk/communicator/Config-not-required.mdx'
+
+##### SSH
+
+@include 'packer-plugin-sdk/communicator/SSH-not-required.mdx'
+
+@include 'packer-plugin-sdk/communicator/SSH-Private-Key-File-not-required.mdx'
+
+##### Windows Remote Management (WinRM)
+
+@include 'packer-plugin-sdk/communicator/WinRM-not-required.mdx'

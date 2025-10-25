@@ -18,17 +18,17 @@ variable "kube_config" {
 source "kubevirt-iso" "fedora" {
   # Kubernetes configuration
   kube_config   = var.kube_config
-  name          = "fedora-42-rand-85"
+  name          = "sles-15-sp7-rand-85"
   namespace     = "images"
 
   # ISO configuration
-  iso_volume_name = "fedora-42-x86-64-iso"
+  iso_volume_name = "sles-15-sp7-x86-64-iso"
 
   # VM type and preferences
-  disk_size          = "10Gi"
+  disk_size          = "20Gi"
   instance_type      = "o1.medium"
   instance_type_kind = "virtualmachineclusterinstancetype" # or "virtualmachineinstancetype"
-  preference         = "fedora"
+  preference         = "sles"
   preference_kind    = "virtualmachineclusterpreference" # or "virtualmachinepreference"
   os_type            = "linux"
 
@@ -39,40 +39,23 @@ source "kubevirt-iso" "fedora" {
     pod {}
   }
 
-  # Network configuration using Multus CNI
-  networks {
-    name = "net1"
-
-    multus {
-      networkName = "multus-01"
-      default = false
-    }
-  }
-
   # Files to include in the ISO installation
   media_files = [
-    "./ks.cfg"
+    "./autoinst.xml"
   ]
 
   # If your storage supports a ReadWriteMany Block device uncomment
   # these:
-  # access_mode = "ReadWriteMany"
-  # volume_mode = "Block"
+  access_mode = "ReadWriteMany"
+  volume_mode = "Block"
 
   # Boot process configuration
   # A set of commands to send over VNC connection
-  # Note that this example shows specifying the path to the
-  # Kickstart file, but if you do not specify it Kickstart will
-  # automatically look for a file named "ks.cfg" provided via
-  # the media_files / media_content options, as long as the media_label
-  # is "OEMDRV" (the default).
   boot_command = [
-    "<up>e",                            # Modify GRUB entry
-    "<down><down><end>",                # Navigate to kernel line
-    " inst.ks=hd:LABEL=OEMDRV:/ks.cfg", # Set kickstart file location
-    "<leftCtrlOn>x<leftCtrlOff>"        # Boot with modified command line
+    "<down><enter>"
   ]
-  boot_wait          = "10s"     # Time to wait after boot starts
+
+  boot_wait          = "5s"     # Time to wait after boot starts
   agent_wait_timeout = "15m"     # Timeout for QEMU Guest Agent to become available
 
   # SSH configuration

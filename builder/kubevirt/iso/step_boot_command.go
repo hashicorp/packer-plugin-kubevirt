@@ -24,7 +24,7 @@ type StepBootCommand struct {
 
 func (s *StepBootCommand) Run(ctx context.Context, state multistep.StateBag) multistep.StepAction {
 	ui := state.Get("ui").(packer.Ui)
-	name := s.config.Name
+	vmname := s.config.VMName
 	namespace := s.config.Namespace
 	bootCommand := strings.Join(s.config.BootCommand, "")
 	bootWait := s.config.BootWait
@@ -40,7 +40,7 @@ func (s *StepBootCommand) Run(ctx context.Context, state multistep.StateBag) mul
 		}
 	}
 
-	streamInterface, err := s.client.VirtualMachineInstance(namespace).VNC(name)
+	streamInterface, err := s.client.VirtualMachineInstance(namespace).VNC(vmname)
 	if err != nil {
 		ui.Error(err.Error())
 		return multistep.ActionHalt

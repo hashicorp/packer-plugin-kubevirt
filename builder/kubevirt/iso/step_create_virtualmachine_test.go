@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/packer-plugin-sdk/multistep"
 	"github.com/hashicorp/packer-plugin-sdk/packer"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	fakek8sclient "k8s.io/client-go/kubernetes/fake"
@@ -34,6 +35,7 @@ var _ = Describe("StepCreateVirtualMachine", func() {
 	)
 
 	var (
+		action     multistep.StepAction
 		ctrl       *gomock.Controller
 		kubeClient *fakek8sclient.Clientset
 		cdiClient  *fakecdiclient.Clientset
@@ -43,7 +45,7 @@ var _ = Describe("StepCreateVirtualMachine", func() {
 		step       *iso.StepCreateVirtualMachine
 	)
 
-	BeforeEach(func() {
+	JustBeforeEach(func() {
 		ctrl = gomock.NewController(GinkgoT())
 
 		uiErr := &strings.Builder{}
@@ -70,10 +72,13 @@ var _ = Describe("StepCreateVirtualMachine", func() {
 		kubecli.MockKubevirtClientInstance.EXPECT().CdiClient().Return(cdiClient).AnyTimes()
 
 		virtClient, _ = kubecli.GetKubevirtClientFromClientConfig(nil)
+		step.Client = virtClient
+	})
 
+	BeforeEach(func() {
 		step = &iso.StepCreateVirtualMachine{
 			Config: iso.Config{
-				Name:                name,
+				VMName:              name,
 				Namespace:           namespace,
 				IsoVolumeName:       "iso-vol",
 				DiskSize:            "1Gi",
@@ -83,8 +88,11 @@ var _ = Describe("StepCreateVirtualMachine", func() {
 				PreferenceKind:      "instancetype.kubevirt.io",
 				OperatingSystemType: "linux",
 				KeepVM:              false,
+				Media: iso.MediaConfig{
+					Label: "OEMDRV",
+				},
+				VirtIOContainer: "registry.example.com/virtio",
 			},
-			Client: virtClient,
 		}
 	})
 
@@ -93,15 +101,18 @@ var _ = Describe("StepCreateVirtualMachine", func() {
 	})
 
 	Context("Run", func() {
-		It("halts when OS type is unsupported", func() {
-			step.Config.OperatingSystemType = "bsd"
-			action := step.Run(context.Background(), state)
-			Expect(action).To(Equal(multistep.ActionHalt))
-		})
+		var (
+			err        error
+			vm         *v1.VirtualMachine
+			readyState bool
+		)
 
-		It("continues when VM is created and becomes Ready", func() {
+		JustBeforeEach(func() {
+			var ctx context.Context
+			var cancel func()
+
 			// Let Run create the VM, then mark it Ready
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel = context.WithCancel(context.Background())
 			defer cancel()
 
 			// Watch for VM creation and patch Ready status
@@ -109,12 +120,182 @@ var _ = Describe("StepCreateVirtualMachine", func() {
 				create := action.(k8stesting.CreateAction)
 				obj := create.GetObject().(*v1.VirtualMachine)
 				// Simulate that VM is created and becomes Ready
-				obj.Status.Ready = true
+				obj.Status.Ready = readyState
 				return false, obj, nil
 			})
 
-			action := step.Run(ctx, state)
+			if readyState == false {
+				cancel()
+			}
+
+			action = step.Run(ctx, state)
+			vm, err = vmClient.KubevirtV1().VirtualMachines(namespace).Get(context.Background(), name, metav1.GetOptions{})
+		})
+
+		BeforeEach(func() {
+			readyState = true
+		})
+
+		When("the OS type is unsupported", func() {
+			BeforeEach(func() {
+				step.Config.OperatingSystemType = "bsd"
+			})
+
+			It("halts when OS type is unsupported", func() {
+				Expect(action).To(Equal(multistep.ActionHalt))
+			})
+		})
+
+		It("continues when VM is created and becomes Ready", func() {
 			Expect(action).To(Equal(multistep.ActionContinue))
+		})
+
+		When("creating a Linux VM", func() {
+			JustBeforeEach(func() {
+				Expect(action).To(Equal(multistep.ActionContinue))
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("sets the instance type correctly", func() {
+				Expect(vm.Spec.Instancetype.Kind).To(Equal("instancetype.kubevirt.io"))
+				Expect(vm.Spec.Instancetype.Name).To(Equal("cx1.medium"))
+			})
+
+			It("sets the preference correctly", func() {
+				Expect(vm.Spec.Preference.Kind).To(Equal("instancetype.kubevirt.io"))
+				Expect(vm.Spec.Preference.Name).To(Equal("fedora"))
+			})
+
+			It("sets the DataVolumeTemplate root disk name correctly", func() {
+				Expect(vm.Spec.DataVolumeTemplates[0].ObjectMeta.Name).To(Equal(name + "-rootdisk"))
+				Expect(vm.Spec.DataVolumeTemplates[0].Spec.PVC.Resources.Requests.Storage().Value()).To(Equal(int64(1 << 30)))
+				Expect(vm.Spec.DataVolumeTemplates[0].Spec.PVC.AccessModes[0]).To(Equal(corev1.ReadWriteOnce))
+			})
+
+			It("configures no networks when none are specified", func() {
+				Expect(vm.Spec.Template.Spec.Networks).To(BeEmpty())
+				Expect(vm.Spec.Template.Spec.Domain.Devices.Interfaces).To(BeEmpty())
+			})
+
+			It("configures the rootdisk device correctly", func() {
+				Expect(vm.Spec.Template.Spec.Domain.Devices.Disks[0].Name).To(Equal("rootdisk"))
+				Expect(vm.Spec.Template.Spec.Domain.Devices.Disks[0].DiskDevice.Disk).To(Equal(&v1.DiskTarget{}))
+				Expect(vm.Spec.Template.Spec.Domain.Devices.Disks[0].BootOrder).To(HaveValue(Equal(uint(1))))
+			})
+
+			It("configures the install ISO device correctly", func() {
+				Expect(vm.Spec.Template.Spec.Domain.Devices.Disks[1].Name).To(Equal("cdrom"))
+				Expect(vm.Spec.Template.Spec.Domain.Devices.Disks[1].DiskDevice.CDRom).To(
+					Equal(&v1.CDRomTarget{Tray: "closed", Bus: "sata"}),
+				)
+				Expect(vm.Spec.Template.Spec.Domain.Devices.Disks[1].BootOrder).To(HaveValue(Equal(uint(2))))
+			})
+
+			It("configures the userdata device correctly", func() {
+				Expect(vm.Spec.Template.Spec.Domain.Devices.Disks[2].Name).To(Equal("userdata"))
+				Expect(vm.Spec.Template.Spec.Domain.Devices.Disks[2].DiskDevice.CDRom).To(
+					Equal(&v1.CDRomTarget{Tray: "closed", Bus: "sata"}),
+				)
+				Expect(vm.Spec.Template.Spec.Domain.Devices.Disks[2].BootOrder).To(BeNil())
+			})
+
+			It("does not configure the virtio container disk device", func() {
+				Expect(len(vm.Spec.Template.Spec.Domain.Devices.Disks)).To(Equal(3))
+			})
+
+			It("configures the rootdisk volume correctly", func() {
+				Expect(vm.Spec.Template.Spec.Volumes[0].Name).To(Equal("rootdisk"))
+				Expect(vm.Spec.Template.Spec.Volumes[0].VolumeSource.DataVolume.Name).To(Equal(name + "-rootdisk"))
+			})
+
+			It("configures the ISO install volume correctly", func() {
+				Expect(vm.Spec.Template.Spec.Volumes[1].Name).To(Equal("cdrom"))
+				Expect(vm.Spec.Template.Spec.Volumes[1].VolumeSource.DataVolume.Name).To(Equal("iso-vol"))
+			})
+
+			It("configures the userdata volume correctly", func() {
+				Expect(vm.Spec.Template.Spec.Volumes[2].Name).To(Equal("userdata"))
+				Expect(vm.Spec.Template.Spec.Volumes[2].VolumeSource.ConfigMap.LocalObjectReference.Name).To(Equal(name))
+				Expect(vm.Spec.Template.Spec.Volumes[2].VolumeSource.ConfigMap.VolumeLabel).To(Equal("OEMDRV"))
+			})
+		})
+
+		When("creating a Windows VM", func() {
+			BeforeEach(func() {
+				step.Config.OperatingSystemType = "windows"
+			})
+
+			It("configures the virtio container disk correctly", func() {
+				Expect(vm.Spec.Template.Spec.Domain.Devices.Disks[2].Name).To(Equal("virtiocontainerdisk"))
+				Expect(vm.Spec.Template.Spec.Domain.Devices.Disks[2].DiskDevice.CDRom).To(
+					Equal(&v1.CDRomTarget{Tray: "closed", Bus: "sata"}),
+				)
+				Expect(vm.Spec.Template.Spec.Domain.Devices.Disks[2].BootOrder).To(BeNil())
+			})
+
+			It("configures the userdata/sysprep device correctly", func() {
+				Expect(vm.Spec.Template.Spec.Domain.Devices.Disks[3].Name).To(Equal("userdata"))
+				Expect(vm.Spec.Template.Spec.Domain.Devices.Disks[3].DiskDevice.CDRom).To(
+					Equal(&v1.CDRomTarget{Tray: "closed", Bus: "sata"}),
+				)
+				Expect(vm.Spec.Template.Spec.Domain.Devices.Disks[3].BootOrder).To(BeNil())
+			})
+
+			It("configures the sysprep volume correctly", func() {
+				Expect(vm.Spec.Template.Spec.Volumes[2].Name).To(Equal("userdata"))
+				Expect(vm.Spec.Template.Spec.Volumes[2].VolumeSource.Sysprep.ConfigMap.Name).To(Equal(name))
+			})
+
+			It("configures the virtio volume correctly", func() {
+				Expect(vm.Spec.Template.Spec.Volumes[3].Name).To(Equal("virtiocontainerdisk"))
+				Expect(vm.Spec.Template.Spec.Volumes[3].VolumeSource.ContainerDisk.Image).To(Equal("registry.example.com/virtio"))
+			})
+		})
+
+		When("setting the access mode to ReadWriteOnce", func() {
+			BeforeEach(func() {
+				step.Config.AccessMode = "ReadWriteOnce"
+			})
+
+			It("correctly sets the access mode", func() {
+				Expect(vm.Spec.DataVolumeTemplates[0].Spec.PVC.AccessModes[0]).To(Equal(corev1.ReadWriteOnce))
+			})
+		})
+
+		When("setting the access mode to ReadWriteMany", func() {
+			BeforeEach(func() {
+				step.Config.AccessMode = "ReadWriteMany"
+			})
+
+			It("correctly sets the access mode", func() {
+				Expect(vm.Spec.DataVolumeTemplates[0].Spec.PVC.AccessModes[0]).To(Equal(corev1.ReadWriteMany))
+			})
+		})
+
+		When("volume_mode is not configured", func() {
+			It("uses Filesystem as the default", func() {
+				Expect(vm.Spec.DataVolumeTemplates[0].Spec.PVC.VolumeMode).To(HaveValue(Equal(corev1.PersistentVolumeFilesystem)))
+			})
+		})
+
+		When("volume_mode=Filesystem", func() {
+			BeforeEach(func() {
+				step.Config.VolumeMode = "Filesystem"
+			})
+
+			It("correctly configures the volume mode", func() {
+				Expect(vm.Spec.DataVolumeTemplates[0].Spec.PVC.VolumeMode).To(HaveValue(Equal(corev1.PersistentVolumeFilesystem)))
+			})
+		})
+
+		When("volume_mode=Block", func() {
+			BeforeEach(func() {
+				step.Config.VolumeMode = "Block"
+			})
+
+			It("correctly configures the volume mode", func() {
+				Expect(vm.Spec.DataVolumeTemplates[0].Spec.PVC.VolumeMode).To(HaveValue(Equal(corev1.PersistentVolumeBlock)))
+			})
 		})
 
 		It("halts when VM creation fails", func() {
@@ -127,23 +308,14 @@ var _ = Describe("StepCreateVirtualMachine", func() {
 			Expect(action).To(Equal(multistep.ActionHalt))
 		})
 
-		It("halts when VM never becomes Ready", func() {
-			_, err := vmClient.KubevirtV1().VirtualMachines(namespace).Create(context.Background(),
-				&v1.VirtualMachine{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      name,
-						Namespace: namespace,
-					},
-					Status: v1.VirtualMachineStatus{Ready: false},
-				},
-				metav1.CreateOptions{})
-			Expect(err).NotTo(HaveOccurred())
+		When("the VM never becomes ready", func() {
+			BeforeEach(func() {
+				readyState = false
+			})
 
-			ctx, cancel := context.WithCancel(context.Background())
-			cancel()
-
-			action := step.Run(ctx, state)
-			Expect(action).To(Equal(multistep.ActionHalt))
+			It("halts", func() {
+				Expect(action).To(Equal(multistep.ActionHalt))
+			})
 		})
 	})
 

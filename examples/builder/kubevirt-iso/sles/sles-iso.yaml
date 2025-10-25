@@ -1,0 +1,26 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: cdi.kubevirt.io/v1beta1
+kind: DataVolume
+metadata:
+  name: sles-15-sp7-x86-64-iso
+  annotations:
+    cdi.kubevirt.io/storage.bind.immediate.requested: "true"
+spec:
+  source:
+    http:
+      #
+      # Set the required URL, or upload it via "virtctl image-upload" to the Kubernetes cluster.
+      #
+      # For Example:
+      #
+      # $ virtctl image-upload dv sles-15-sp7-x86-64-iso --size=10Gi --image-path=./SLE-15-SP7-Full-x86_64-GM-Media1.iso --force-bind --insecure
+      #
+      url: "<URL>"
+  pvc:
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: 20Gi
