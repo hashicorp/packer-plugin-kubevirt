@@ -78,7 +78,14 @@ func (p *PortForwarder) StartForwardingTCP(address *net.IPAddr, port ForwardedPo
 	return nil
 }
 
+func (p *PortForwarder) closeListener(listener net.Listener) {
+	if err := listener.Close(); err != nil {
+		log.Log.Errorf("error closing listener: %v", err)
+	}
+}
+
 func (p *PortForwarder) WaitForConnection(listener net.Listener, port ForwardedPort) {
+	defer p.closeListener(listener)
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
@@ -89,7 +96,8 @@ func (p *PortForwarder) WaitForConnection(listener net.Listener, port ForwardedP
 		stream, err := p.Resource.PortForward(p.Name, port.Remote, port.Protocol)
 		if err != nil {
 			log.Log.Errorf("can't access %s/%s.%s: %v", p.Kind, p.Name, p.Namespace, err)
-			return
+			conn.Close()
+			continue
 		}
 		go p.HandleConnection(conn, stream.AsConn(), port)
 	}
