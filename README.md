@@ -2,8 +2,6 @@
 
 The `KubeVirt` plugin can be used with [HashiCorp Packer](https://www.packer.io) to create KubeVirt images.
 
-**Note**: This plugin is under development and is not production ready.
-
 ## Packer
 
 [Packer](https://developer.hashicorp.com/packer) is a tool for creating identical machine images from a single source template.
