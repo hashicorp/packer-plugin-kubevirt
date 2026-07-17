@@ -79,6 +79,10 @@ var _ = Describe("StepCreateBootableVolume", func() {
 			cdiClient.PrependReactor("create", "datavolumes", func(action testing.Action) (bool, runtime.Object, error) {
 				create := action.(testing.CreateAction)
 				dv := create.GetObject().(*cdiv1beta1.DataVolume)
+				Expect(dv.Annotations).To(HaveKeyWithValue(
+					"cdi.kubevirt.io/storage.bind.immediate.requested",
+					"true",
+				))
 				dv.Status.Phase = cdiv1beta1.Succeeded
 
 				// Important: store DV in the fake client's tracker
