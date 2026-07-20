@@ -17,6 +17,8 @@ import (
 	cdiv1 "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 )
 
+const immediateBindingAnnotation = "cdi.kubevirt.io/storage.bind.immediate.requested"
+
 func configMap(name string, mediaFiles []string) (*corev1.ConfigMap, error) {
 	data := make(map[string]string)
 
@@ -138,6 +140,9 @@ func cloneVolume(name, namespace, diskSize string) *cdiv1.DataVolume {
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
+			Annotations: map[string]string{
+				immediateBindingAnnotation: "true",
+			},
 		},
 		Spec: cdiv1.DataVolumeSpec{
 			Source: &cdiv1.DataVolumeSource{
