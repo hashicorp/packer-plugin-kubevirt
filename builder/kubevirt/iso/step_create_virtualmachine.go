@@ -49,6 +49,7 @@ func (s *StepCreateVirtualMachine) Run(ctx context.Context, state multistep.Stat
 		instanceTypeKind,
 		preferenceKind,
 		osType,
+		s.Config.StorageClassName,
 		networks)
 
 	ui.Sayf("Creating a new temporary VirtualMachine (%s/%s)...", namespace, name)

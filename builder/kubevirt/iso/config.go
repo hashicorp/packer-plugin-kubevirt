@@ -73,6 +73,9 @@ type Config struct {
 	IsoVolumeName string `mapstructure:"iso_volume_name" required:"true"`
 	// DiskSize is the size of the root disk to of the temporary VM.
 	DiskSize string `mapstructure:"disk_size" required:"true"`
+	// StorageClassName is the name of the storage class to use for the root disk.
+	// If not specified, the default storage class will be used.
+	StorageClassName string `mapstructure:"storage_class_name" required:"false"`
 	// InstanceType is the name of the InstanceType resource to use in the temporary VM.
 	InstanceType string `mapstructure:"instance_type" required:"true"`
 	// InstanceTypeKind is the kind of the InstanceType resource to use in the temporary VM.

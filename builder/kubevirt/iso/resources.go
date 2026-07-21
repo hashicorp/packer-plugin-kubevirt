@@ -40,6 +40,34 @@ func configMap(name string, mediaFiles []string) (*corev1.ConfigMap, error) {
 	}, nil
 }
 
+func createDataVolumeTemplate(name, diskSize, storageClassName string) v1.DataVolumeTemplateSpec {
+	template := v1.DataVolumeTemplateSpec{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name + "-rootdisk",
+		},
+		Spec: cdiv1.DataVolumeSpec{
+			PVC: &corev1.PersistentVolumeClaimSpec{
+				Resources: corev1.VolumeResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceName(corev1.ResourceStorage): resource.MustParse(diskSize),
+					},
+				},
+				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+			},
+			Source: &cdiv1.DataVolumeSource{
+				Blank: &cdiv1.DataVolumeBlankImage{},
+			},
+		},
+	}
+
+	// Only set StorageClassName if provided
+	if storageClassName != "" {
+		template.Spec.PVC.StorageClassName = ptr.To(storageClassName)
+	}
+
+	return template
+}
+
 func virtualMachine(
 	name,
 	isoVolumeName,
@@ -48,7 +76,8 @@ func virtualMachine(
 	preferenceName,
 	instanceTypeKind,
 	preferenceKind,
-	osType string,
+	osType,
+	storageClassName string,
 	networks []Network) *v1.VirtualMachine {
 	var disks []v1.Disk
 	var volumes []v1.Volume
@@ -97,24 +126,7 @@ func virtualMachine(
 				Name: preferenceName,
 			},
 			DataVolumeTemplates: []v1.DataVolumeTemplateSpec{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: name + "-rootdisk",
-					},
-					Spec: cdiv1.DataVolumeSpec{
-						PVC: &corev1.PersistentVolumeClaimSpec{
-							Resources: corev1.VolumeResourceRequirements{
-								Requests: corev1.ResourceList{
-									corev1.ResourceName(corev1.ResourceStorage): resource.MustParse(diskSize),
-								},
-							},
-							AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-						},
-						Source: &cdiv1.DataVolumeSource{
-							Blank: &cdiv1.DataVolumeBlankImage{},
-						},
-					},
-				},
+				createDataVolumeTemplate(name, diskSize, storageClassName),
 			},
 			Template: &v1.VirtualMachineInstanceTemplateSpec{
 				Spec: v1.VirtualMachineInstanceSpec{
@@ -132,8 +144,8 @@ func virtualMachine(
 	}
 }
 
-func cloneVolume(name, namespace, diskSize string) *cdiv1.DataVolume {
-	return &cdiv1.DataVolume{
+func cloneVolume(name, namespace, diskSize, storageClassName string) *cdiv1.DataVolume {
+	dv := &cdiv1.DataVolume{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: cdiv1.CDIGroupVersionKind.GroupVersion().String(),
 			Kind:       "DataVolume",
@@ -161,6 +173,13 @@ func cloneVolume(name, namespace, diskSize string) *cdiv1.DataVolume {
 			},
 		},
 	}
+
+	// Only set StorageClassName if provided
+	if storageClassName != "" {
+		dv.Spec.PVC.StorageClassName = ptr.To(storageClassName)
+	}
+
+	return dv
 }
 
 func sourceVolume(name, namespace, instanceType, preferenceName string) *cdiv1.DataSource {
