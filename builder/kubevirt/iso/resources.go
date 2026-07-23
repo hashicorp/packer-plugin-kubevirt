@@ -48,7 +48,8 @@ func virtualMachine(
 	preferenceName,
 	instanceTypeKind,
 	preferenceKind,
-	osType string,
+	osType,
+	diskBus string,
 	networks []Network) *v1.VirtualMachine {
 	var disks []v1.Disk
 	var volumes []v1.Volume
@@ -65,7 +66,7 @@ func virtualMachine(
 	}
 
 	if osType == "linux" {
-		disks = getLinuxVirtualMachineDisks()
+		disks = getLinuxVirtualMachineDisks(diskBus)
 		volumes = getLinuxVirtualMachineVolumes(name, isoVolumeName)
 	}
 
@@ -187,7 +188,7 @@ func sourceVolume(name, namespace, instanceType, preferenceName string) *cdiv1.D
 	}
 }
 
-func getLinuxVirtualMachineDisks() []v1.Disk {
+func getLinuxVirtualMachineDisks(diskBus string) []v1.Disk {
 	rootdisk := uint(1)
 	cdrom := uint(2)
 	oemdrv := uint(3)
@@ -197,7 +198,7 @@ func getLinuxVirtualMachineDisks() []v1.Disk {
 			Name: "cdrom",
 			DiskDevice: v1.DiskDevice{
 				CDRom: &v1.CDRomTarget{
-					Bus:  "sata",
+					Bus:  v1.DiskBus(diskBus),
 					Tray: "closed",
 				},
 			},
@@ -207,7 +208,7 @@ func getLinuxVirtualMachineDisks() []v1.Disk {
 			Name: "oemdrv",
 			DiskDevice: v1.DiskDevice{
 				CDRom: &v1.CDRomTarget{
-					Bus:  "sata",
+					Bus:  v1.DiskBus(diskBus),
 					Tray: "closed",
 				},
 			},

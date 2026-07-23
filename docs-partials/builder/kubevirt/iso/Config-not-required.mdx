@@ -9,6 +9,11 @@
 - `os_type` (string) - OperatingSystemType is the type of operating system to install.
   Supported values are "linux" and "windows". Default is "linux".
 
+- `disk_bus` (string) - DiskBus is the bus type to use for CD-ROM disk devices on the temporary VM.
+  Supported values are "scsi", "sata", and "virtio".
+  Defaults to "scsi", which is compatible with both x86 and arm64 architectures.
+  Use "sata" on x86 clusters if required by your storage configuration.
+
 - `networks` ([]Network) - Networks is a list of networks to attach to the temporary VM.
   If no networks are specified, a single pod network will be used.
 
