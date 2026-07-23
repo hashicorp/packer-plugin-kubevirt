@@ -197,6 +197,7 @@ func getLinuxVirtualMachineDisks() []v1.Disk {
 			Name: "cdrom",
 			DiskDevice: v1.DiskDevice{
 				CDRom: &v1.CDRomTarget{
+					Bus:  "sata",
 					Tray: "closed",
 				},
 			},
@@ -206,6 +207,7 @@ func getLinuxVirtualMachineDisks() []v1.Disk {
 			Name: "oemdrv",
 			DiskDevice: v1.DiskDevice{
 				CDRom: &v1.CDRomTarget{
+					Bus:  "sata",
 					Tray: "closed",
 				},
 			},
