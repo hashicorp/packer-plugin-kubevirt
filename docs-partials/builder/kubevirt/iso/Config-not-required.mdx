@@ -56,4 +56,9 @@
   However, it is recommended to set this to false in production environments to avoid
   resource leaks.
 
+- `skip_create_image` (bool) - SkipCreateImage when set to true skips creating the final bootable volume
+  DataSource and does not register the artifact with HCP Packer. This is
+  useful for iterative debugging when you do not want to produce a final image.
+  Default is false.
+
 <!-- End of code generated from the comments of the Config struct in builder/kubevirt/iso/config.go; -->

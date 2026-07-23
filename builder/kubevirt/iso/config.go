@@ -136,6 +136,12 @@ type Config struct {
 	// However, it is recommended to set this to false in production environments to avoid
 	// resource leaks.
 	KeepVM bool `mapstructure:"keep_vm" required:"false"`
+
+	// SkipCreateImage when set to true skips creating the final bootable volume
+	// DataSource and does not register the artifact with HCP Packer. This is
+	// useful for iterative debugging when you do not want to produce a final image.
+	// Default is false.
+	SkipCreateImage bool `mapstructure:"skip_create_image" required:"false"`
 }
 
 func (c *Config) Prepare(raws ...interface{}) ([]string, error) {

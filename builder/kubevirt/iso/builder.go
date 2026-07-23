@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/packer-plugin-sdk/multistep"
 	"github.com/hashicorp/packer-plugin-sdk/multistep/commonsteps"
 	"github.com/hashicorp/packer-plugin-sdk/packer"
+	"github.com/hashicorp/packer-plugin-sdk/packerbuilderdata"
 	"github.com/hashicorp/packer-plugin-sdk/template/interpolate"
 
 	"k8s.io/client-go/kubernetes"
@@ -60,10 +61,16 @@ func (b *Builder) Prepare(raws ...interface{}) ([]string, []string, error) {
 		return nil, warnings, fmt.Errorf("failed to create Kubernetes clientset: %w", err)
 	}
 	b.clientset = clientset
-	return nil, warnings, nil
+	return []string{"BootableVolumeName"}, warnings, nil
 }
 
 func (b *Builder) Run(ctx context.Context, ui packer.Ui, hook packer.Hook) (packer.Artifact, error) {
+	state := new(multistep.BasicStateBag)
+	state.Put("hook", hook)
+	state.Put("ui", ui)
+
+	generatedData := &packerbuilderdata.GeneratedData{State: state}
+
 	steps := []multistep.Step{}
 	steps = append(steps,
 		&StepValidateIsoDataVolume{
@@ -110,24 +117,43 @@ func (b *Builder) Run(ctx context.Context, ui packer.Ui, hook packer.Hook) (pack
 			Config: b.config,
 			Client: b.client,
 		},
-		&StepCreateBootableVolume{
-			Config: b.config,
-			Client: b.client,
-		},
 	)
 
-	state := new(multistep.BasicStateBag)
-	state.Put("hook", hook)
-	state.Put("ui", ui)
+	if !b.config.SkipCreateImage {
+		steps = append(steps, &StepCreateBootableVolume{
+			Config:        b.config,
+			Client:        b.client,
+			GeneratedData: generatedData,
+		})
+	}
 
 	b.runner = commonsteps.NewRunner(steps, b.config.PackerConfig, ui)
 	b.runner.Run(ctx, state)
+
+	if rawErr, ok := state.GetOk("error"); ok {
+		return nil, rawErr.(error)
+	}
+	if _, ok := state.GetOk(multistep.StateCancelled); ok {
+		return nil, nil
+	}
+
+	if b.config.SkipCreateImage {
+		return nil, nil
+	}
 
 	bootableVolumeName, ok := state.Get("bootable_volume_name").(string)
 	if !ok || bootableVolumeName == "" {
 		return nil, fmt.Errorf("bootable volume name not found in state")
 	}
-	return &Artifact{Name: bootableVolumeName}, nil
+	namespace, _ := state.Get("bootable_volume_namespace").(string)
+
+	return &Artifact{
+		Name:      bootableVolumeName,
+		Namespace: namespace,
+		StateData: map[string]any{
+			"generated_data": state.Get("generated_data"),
+		},
+	}, nil
 }
 
 func (b *Builder) buildSSHSteps() ([]multistep.Step, []error) {
