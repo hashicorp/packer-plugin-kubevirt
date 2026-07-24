@@ -3,7 +3,7 @@ packer-plugin-kubevirt
 **/packer_log*.txt
 **/git_*test.pkr.hcl
 crash.log
-
+temp/
 dist/*
 .docs/*
 docs.zip

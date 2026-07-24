@@ -8,6 +8,7 @@ import (
 
 	"github.com/hashicorp/packer-plugin-sdk/multistep"
 	"github.com/hashicorp/packer-plugin-sdk/packer"
+	"github.com/hashicorp/packer-plugin-sdk/packerbuilderdata"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -15,8 +16,9 @@ import (
 )
 
 type StepCreateBootableVolume struct {
-	Config Config
-	Client kubecli.KubevirtClient
+	Config        Config
+	Client        kubecli.KubevirtClient
+	GeneratedData *packerbuilderdata.GeneratedData
 }
 
 func (s *StepCreateBootableVolume) Run(ctx context.Context, state multistep.StateBag) multistep.StepAction {
@@ -49,6 +51,8 @@ func (s *StepCreateBootableVolume) Run(ctx context.Context, state multistep.Stat
 	}
 
 	state.Put("bootable_volume_name", ds.Name)
+	state.Put("bootable_volume_namespace", namespace)
+	s.GeneratedData.Put("BootableVolumeName", ds.Name)
 	return multistep.ActionContinue
 }
 

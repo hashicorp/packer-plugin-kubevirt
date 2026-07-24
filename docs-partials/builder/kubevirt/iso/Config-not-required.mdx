@@ -9,6 +9,11 @@
 - `os_type` (string) - OperatingSystemType is the type of operating system to install.
   Supported values are "linux" and "windows". Default is "linux".
 
+- `disk_bus` (string) - DiskBus is the bus type to use for CD-ROM disk devices on the temporary VM.
+  Supported values are "scsi", "sata", and "virtio".
+  Defaults to "scsi", which is compatible with both x86 and arm64 architectures.
+  Use "sata" on x86 clusters if required by your storage configuration.
+
 - `networks` ([]Network) - Networks is a list of networks to attach to the temporary VM.
   If no networks are specified, a single pod network will be used.
 
@@ -55,5 +60,10 @@
   This can be useful for debugging purposes, to inspect the VM and its disks.
   However, it is recommended to set this to false in production environments to avoid
   resource leaks.
+
+- `skip_create_image` (bool) - SkipCreateImage when set to true skips creating the final bootable volume
+  DataSource and does not register the artifact with HCP Packer. This is
+  useful for iterative debugging when you do not want to produce a final image.
+  Default is false.
 
 <!-- End of code generated from the comments of the Config struct in builder/kubevirt/iso/config.go; -->

@@ -28,6 +28,7 @@ type FlatConfig struct {
 	Preference              *string           `mapstructure:"preference" required:"true" cty:"preference" hcl:"preference"`
 	PreferenceKind          *string           `mapstructure:"preference_kind" required:"false" cty:"preference_kind" hcl:"preference_kind"`
 	OperatingSystemType     *string           `mapstructure:"os_type" required:"false" cty:"os_type" hcl:"os_type"`
+	DiskBus                 *string           `mapstructure:"disk_bus" required:"false" cty:"disk_bus" hcl:"disk_bus"`
 	Networks                []FlatNetwork     `mapstructure:"networks" required:"false" cty:"networks" hcl:"networks"`
 	MediaFiles              []string          `mapstructure:"media_files" required:"false" cty:"media_files" hcl:"media_files"`
 	BootCommand             []string          `mapstructure:"boot_command" required:"false" cty:"boot_command" hcl:"boot_command"`
@@ -47,6 +48,7 @@ type FlatConfig struct {
 	WinRMPassword           *string           `mapstructure:"winrm_password" required:"false" cty:"winrm_password" hcl:"winrm_password"`
 	WinRMWaitTimeout        *string           `mapstructure:"winrm_wait_timeout" required:"false" cty:"winrm_wait_timeout" hcl:"winrm_wait_timeout"`
 	KeepVM                  *bool             `mapstructure:"keep_vm" required:"false" cty:"keep_vm" hcl:"keep_vm"`
+	SkipCreateImage         *bool             `mapstructure:"skip_create_image" required:"false" cty:"skip_create_image" hcl:"skip_create_image"`
 }
 
 // FlatMapstructure returns a new FlatConfig.
@@ -79,6 +81,7 @@ func (*FlatConfig) HCL2Spec() map[string]hcldec.Spec {
 		"preference":                 &hcldec.AttrSpec{Name: "preference", Type: cty.String, Required: false},
 		"preference_kind":            &hcldec.AttrSpec{Name: "preference_kind", Type: cty.String, Required: false},
 		"os_type":                    &hcldec.AttrSpec{Name: "os_type", Type: cty.String, Required: false},
+		"disk_bus":                   &hcldec.AttrSpec{Name: "disk_bus", Type: cty.String, Required: false},
 		"networks":                   &hcldec.BlockListSpec{TypeName: "networks", Nested: hcldec.ObjectSpec((*FlatNetwork)(nil).HCL2Spec())},
 		"media_files":                &hcldec.AttrSpec{Name: "media_files", Type: cty.List(cty.String), Required: false},
 		"boot_command":               &hcldec.AttrSpec{Name: "boot_command", Type: cty.List(cty.String), Required: false},
@@ -98,6 +101,7 @@ func (*FlatConfig) HCL2Spec() map[string]hcldec.Spec {
 		"winrm_password":             &hcldec.AttrSpec{Name: "winrm_password", Type: cty.String, Required: false},
 		"winrm_wait_timeout":         &hcldec.AttrSpec{Name: "winrm_wait_timeout", Type: cty.String, Required: false},
 		"keep_vm":                    &hcldec.AttrSpec{Name: "keep_vm", Type: cty.Bool, Required: false},
+		"skip_create_image":          &hcldec.AttrSpec{Name: "skip_create_image", Type: cty.Bool, Required: false},
 	}
 	return s
 }
