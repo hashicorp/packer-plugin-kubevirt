@@ -77,12 +77,12 @@ func decodeRegistryImage(t *testing.T, result any) registryimage.Image {
 
 func TestArtifact_State_HCP(t *testing.T) {
 	tests := []struct {
-		name          string
-		artifact      *Artifact
-		wantImageID   string
-		wantProvider  string
-		wantRegion    string
-		wantLabels    map[string]string
+		name         string
+		artifact     *Artifact
+		wantImageID  string
+		wantProvider string
+		wantRegion   string
+		wantLabels   map[string]string
 	}{
 		{
 			name: "no generated_data",
