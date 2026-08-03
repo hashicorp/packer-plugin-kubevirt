@@ -86,6 +86,11 @@ type Config struct {
 	// OperatingSystemType is the type of operating system to install.
 	// Supported values are "linux" and "windows". Default is "linux".
 	OperatingSystemType string `mapstructure:"os_type" required:"false"`
+	// DiskBus is the bus type to use for CD-ROM disk devices on the temporary VM.
+	// Supported values are "scsi", "sata", and "virtio".
+	// Defaults to "scsi", which is compatible with both x86 and arm64 architectures.
+	// Use "sata" on x86 clusters if required by your storage configuration.
+	DiskBus string `mapstructure:"disk_bus" required:"false"`
 	// Networks is a list of networks to attach to the temporary VM.
 	// If no networks are specified, a single pod network will be used.
 	Networks []Network `mapstructure:"networks" required:"false"`
@@ -136,6 +141,12 @@ type Config struct {
 	// However, it is recommended to set this to false in production environments to avoid
 	// resource leaks.
 	KeepVM bool `mapstructure:"keep_vm" required:"false"`
+
+	// SkipCreateImage when set to true skips creating the final bootable volume
+	// DataSource and does not register the artifact with HCP Packer. This is
+	// useful for iterative debugging when you do not want to produce a final image.
+	// Default is false.
+	SkipCreateImage bool `mapstructure:"skip_create_image" required:"false"`
 }
 
 func (c *Config) Prepare(raws ...interface{}) ([]string, error) {
@@ -145,6 +156,10 @@ func (c *Config) Prepare(raws ...interface{}) ([]string, error) {
 	}, raws...)
 	if err != nil {
 		return nil, err
+	}
+
+	if c.DiskBus == "" {
+		c.DiskBus = "scsi"
 	}
 
 	for _, n := range c.Networks {

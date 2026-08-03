@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/packer-plugin-kubevirt/builder/kubevirt/iso"
 	"github.com/hashicorp/packer-plugin-sdk/multistep"
 	"github.com/hashicorp/packer-plugin-sdk/packer"
+	"github.com/hashicorp/packer-plugin-sdk/packerbuilderdata"
 
 	fakecdiclient "kubevirt.io/client-go/containerizeddataimporter/fake"
 	"kubevirt.io/client-go/kubecli"
@@ -66,7 +67,8 @@ var _ = Describe("StepCreateBootableVolume", func() {
 				InstanceType: "cx1.large",
 				Preference:   "fedora",
 			},
-			Client: virtClient,
+			Client:        virtClient,
+			GeneratedData: &packerbuilderdata.GeneratedData{State: state},
 		}
 	})
 
