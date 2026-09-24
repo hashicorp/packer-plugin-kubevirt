@@ -49,7 +49,8 @@ func virtualMachine(
 	instanceTypeKind,
 	preferenceKind,
 	osType,
-	diskBus string,
+	diskBus,
+	mediaLabel string,
 	networks []Network) *v1.VirtualMachine {
 	var disks []v1.Disk
 	var volumes []v1.Volume
@@ -67,7 +68,7 @@ func virtualMachine(
 
 	if osType == "linux" {
 		disks = getLinuxVirtualMachineDisks(diskBus)
-		volumes = getLinuxVirtualMachineVolumes(name, isoVolumeName)
+		volumes = getLinuxVirtualMachineVolumes(name, isoVolumeName, mediaLabel)
 	}
 
 	if osType == "windows" {
@@ -224,7 +225,11 @@ func getLinuxVirtualMachineDisks(diskBus string) []v1.Disk {
 	}
 }
 
-func getLinuxVirtualMachineVolumes(name, isoVolumeName string) []v1.Volume {
+func getLinuxVirtualMachineVolumes(name, isoVolumeName, mediaLabel string) []v1.Volume {
+	if mediaLabel == "" {
+		mediaLabel = DefaultMediaLabel
+	}
+
 	return []v1.Volume{
 		{
 			Name: "cdrom",
@@ -249,7 +254,7 @@ func getLinuxVirtualMachineVolumes(name, isoVolumeName string) []v1.Volume {
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: name,
 					},
-					VolumeLabel: "OEMDRV",
+					VolumeLabel: mediaLabel,
 				},
 			},
 		},

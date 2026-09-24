@@ -19,6 +19,12 @@
 
 - `media_files` ([]string) - MediaFiles is a path list of files to be copied and used during the ISO installation.
 
+- `media_label` (string) - MediaLabel is the volume label of the disk that holds the `media_files`.
+  Different installers discover their configuration through different labels, e.g.
+  "OEMDRV" for Anaconda kickstart (RHEL, Fedora) or "cidata" for cloud-init
+  NoCloud / Subiquity autoinstall (Ubuntu). Only applies when `os_type` is "linux".
+  Must be at most 32 characters long. Defaults to "OEMDRV".
+
 - `boot_command` ([]string) - BootCommand is a list of strings that represent the keystrokes to be sent to the VM console
   to automate the installation via a new VNC connection.
 

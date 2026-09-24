@@ -2,6 +2,7 @@
 
 - [Fedora](./fedora/)
 - [RHEL](./rhel/)
+- [Ubuntu](./ubuntu/)
 - [Windows](./windows/)
 
 ### Example Usage

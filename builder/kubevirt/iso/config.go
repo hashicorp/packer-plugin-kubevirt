@@ -59,6 +59,12 @@ type MultusNetwork struct {
 	Default bool `mapstructure:"default,omitempty"`
 }
 
+const (
+	// DefaultMediaLabel is the volume label that Anaconda (kickstart) auto-discovers.
+	DefaultMediaLabel   = "OEMDRV"
+	maxMediaLabelLength = 32
+)
+
 type Config struct {
 	common.PackerConfig `mapstructure:",squash"`
 
@@ -96,6 +102,12 @@ type Config struct {
 	Networks []Network `mapstructure:"networks" required:"false"`
 	// MediaFiles is a path list of files to be copied and used during the ISO installation.
 	MediaFiles []string `mapstructure:"media_files" required:"false"`
+	// MediaLabel is the volume label of the disk that holds the `media_files`.
+	// Different installers discover their configuration through different labels, e.g.
+	// "OEMDRV" for Anaconda kickstart (RHEL, Fedora) or "cidata" for cloud-init
+	// NoCloud / Subiquity autoinstall (Ubuntu). Only applies when `os_type` is "linux".
+	// Must be at most 32 characters long. Defaults to "OEMDRV".
+	MediaLabel string `mapstructure:"media_label" required:"false"`
 	// BootCommand is a list of strings that represent the keystrokes to be sent to the VM console
 	// to automate the installation via a new VNC connection.
 	BootCommand []string `mapstructure:"boot_command" required:"false"`
@@ -160,6 +172,15 @@ func (c *Config) Prepare(raws ...interface{}) ([]string, error) {
 
 	if c.DiskBus == "" {
 		c.DiskBus = "scsi"
+	}
+
+	if c.MediaLabel == "" {
+		c.MediaLabel = DefaultMediaLabel
+	}
+
+	// The media disk is an ISO 9660 image, whose volume identifier is limited to 32 characters.
+	if len(c.MediaLabel) > maxMediaLabelLength {
+		return nil, fmt.Errorf("media_label %q must be at most %d characters long", c.MediaLabel, maxMediaLabelLength)
 	}
 
 	for _, n := range c.Networks {

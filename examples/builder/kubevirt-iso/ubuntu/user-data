@@ -1,0 +1,28 @@
+#cloud-config
+# Copyright (c) Red Hat, Inc.
+# SPDX-License-Identifier: MPL-2.0
+#
+# Ubuntu Subiquity autoinstall configuration, consumed through cloud-init NoCloud.
+# Reference: https://canonical-subiquity.readthedocs-hosted.com/en/latest/reference/autoinstall-reference.html
+autoinstall:
+  version: 1
+  locale: en_US.UTF-8
+  keyboard:
+    layout: us
+  timezone: Europe/Paris
+  identity:
+    hostname: ubuntu
+    username: ubuntu
+    # Generated with: openssl passwd -6 ubuntu
+    password: "$6$kubevirtpk$bK.ydp07YBZfv8LErv4f.QhWy.U5dlLSR/Bkr8tcoJHZgRddygFxnYcKPBGBXvzgQr6lUM3v9SjjUHVklh64g1"
+  ssh:
+    install-server: true
+    allow-pw: true
+  storage:
+    layout:
+      name: lvm
+  packages:
+    - qemu-guest-agent
+  late-commands:
+    - curtin in-target --target=/target -- systemctl enable qemu-guest-agent
+  shutdown: reboot

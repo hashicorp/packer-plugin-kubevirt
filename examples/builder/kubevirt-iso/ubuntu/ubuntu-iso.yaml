@@ -1,0 +1,19 @@
+# Copyright IBM Corp. 2013, 2026
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: cdi.kubevirt.io/v1beta1
+kind: DataVolume
+metadata:
+  name: ubuntu-2404-x86-64-iso
+  annotations:
+    cdi.kubevirt.io/storage.bind.immediate.requested: "true"
+spec:
+  source:
+    http:
+      url: "https://releases.ubuntu.com/noble/ubuntu-24.04.5-live-server-amd64.iso"
+  pvc:
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: 5Gi

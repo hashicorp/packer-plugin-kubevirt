@@ -31,6 +31,7 @@ type FlatConfig struct {
 	DiskBus                 *string           `mapstructure:"disk_bus" required:"false" cty:"disk_bus" hcl:"disk_bus"`
 	Networks                []FlatNetwork     `mapstructure:"networks" required:"false" cty:"networks" hcl:"networks"`
 	MediaFiles              []string          `mapstructure:"media_files" required:"false" cty:"media_files" hcl:"media_files"`
+	MediaLabel              *string           `mapstructure:"media_label" required:"false" cty:"media_label" hcl:"media_label"`
 	BootCommand             []string          `mapstructure:"boot_command" required:"false" cty:"boot_command" hcl:"boot_command"`
 	BootWait                *string           `mapstructure:"boot_wait" required:"false" cty:"boot_wait" hcl:"boot_wait"`
 	InstallationWaitTimeout *string           `mapstructure:"installation_wait_timeout" required:"true" cty:"installation_wait_timeout" hcl:"installation_wait_timeout"`
@@ -84,6 +85,7 @@ func (*FlatConfig) HCL2Spec() map[string]hcldec.Spec {
 		"disk_bus":                   &hcldec.AttrSpec{Name: "disk_bus", Type: cty.String, Required: false},
 		"networks":                   &hcldec.BlockListSpec{TypeName: "networks", Nested: hcldec.ObjectSpec((*FlatNetwork)(nil).HCL2Spec())},
 		"media_files":                &hcldec.AttrSpec{Name: "media_files", Type: cty.List(cty.String), Required: false},
+		"media_label":                &hcldec.AttrSpec{Name: "media_label", Type: cty.String, Required: false},
 		"boot_command":               &hcldec.AttrSpec{Name: "boot_command", Type: cty.List(cty.String), Required: false},
 		"boot_wait":                  &hcldec.AttrSpec{Name: "boot_wait", Type: cty.String, Required: false},
 		"installation_wait_timeout":  &hcldec.AttrSpec{Name: "installation_wait_timeout", Type: cty.String, Required: false},
