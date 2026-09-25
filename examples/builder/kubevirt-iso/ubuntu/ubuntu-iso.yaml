@@ -11,9 +11,13 @@ spec:
   source:
     http:
       url: "https://releases.ubuntu.com/noble/ubuntu-24.04.5-live-server-amd64.iso"
-  pvc:
+  # "storage" (unlike "pvc") applies the cluster's StorageProfile defaults and
+  # adds filesystem overhead to the requested size.
+  storage:
+    # storageClassName: <storage-class>  # e.g. lvms-vg1 on LVMS / single-node OpenShift
     accessModes:
       - ReadWriteOnce
+    volumeMode: Filesystem
     resources:
       requests:
         storage: 10Gi
