@@ -1,0 +1,23 @@
+# Copyright IBM Corp. 2013, 2026
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: cdi.kubevirt.io/v1beta1
+kind: DataVolume
+metadata:
+  name: ubuntu-2404-x86-64-iso
+  annotations:
+    cdi.kubevirt.io/storage.bind.immediate.requested: "true"
+spec:
+  source:
+    http:
+      url: "https://releases.ubuntu.com/noble/ubuntu-24.04.5-live-server-amd64.iso"
+  # "storage" (unlike "pvc") applies the cluster's StorageProfile defaults and
+  # adds filesystem overhead to the requested size.
+  storage:
+    # storageClassName: <storage-class>  # e.g. lvms-vg1 on LVMS / single-node OpenShift
+    accessModes:
+      - ReadWriteOnce
+    volumeMode: Filesystem
+    resources:
+      requests:
+        storage: 10Gi

@@ -117,6 +117,36 @@ var _ = Describe("StepCreateVirtualMachine", func() {
 			Expect(action).To(Equal(multistep.ActionContinue))
 		})
 
+		DescribeTable("sets the media volume label",
+			func(mediaLabel, expectedLabel string) {
+				step.Config.MediaLabel = mediaLabel
+
+				var created *v1.VirtualMachine
+				vmClient.Fake.PrependReactor("create", "virtualmachines", func(action k8stesting.Action) (bool, runtime.Object, error) {
+					created = action.(k8stesting.CreateAction).GetObject().(*v1.VirtualMachine)
+					created.Status.Ready = true
+					return false, created, nil
+				})
+
+				action := step.Run(context.Background(), state)
+				Expect(action).To(Equal(multistep.ActionContinue))
+				Expect(created).NotTo(BeNil())
+
+				var mediaVolume *v1.Volume
+				for i, vol := range created.Spec.Template.Spec.Volumes {
+					if vol.ConfigMap != nil {
+						mediaVolume = &created.Spec.Template.Spec.Volumes[i]
+					}
+				}
+				Expect(mediaVolume).NotTo(BeNil())
+				Expect(mediaVolume.ConfigMap.Name).To(Equal(name))
+				Expect(mediaVolume.ConfigMap.VolumeLabel).To(Equal(expectedLabel))
+			},
+			Entry("defaults to OEMDRV when unset", "", "OEMDRV"),
+			Entry("uses OEMDRV for kickstart", "OEMDRV", "OEMDRV"),
+			Entry("uses cidata for cloud-init / Ubuntu autoinstall", "cidata", "cidata"),
+		)
+
 		It("halts when VM creation fails", func() {
 			// Inject error into fake client
 			vmClient.Fake.PrependReactor("create", "virtualmachines", func(action k8stesting.Action) (bool, runtime.Object, error) {
