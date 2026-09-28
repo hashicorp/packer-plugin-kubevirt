@@ -103,12 +103,13 @@ var _ = Describe("StepStartPortForward", func() {
 		mockFwd = &mockPortForwarder{}
 		step = &iso.StepStartPortForward{
 			Config: iso.Config{
-				Name:          name,
-				Namespace:     namespace,
-				Communicator:  "ssh",
-				SSHHost:       "127.0.0.1",
-				SSHLocalPort:  2222,
-				SSHRemotePort: 22,
+				Name:      name,
+				Namespace: namespace,
+				Comm: communicator.Config{
+					Type: "ssh",
+					SSH:  communicator.SSH{SSHHost: "127.0.0.1", SSHPort: 22},
+				},
+				PortForwardConfig: iso.PortForwardConfig{SSHLocalPort: 2222},
 			},
 			Client: virtClient,
 			ForwarderFunc: func(kind, ns, n string, resource common.PortforwardableResource) iso.PortForwarder {
@@ -138,7 +139,7 @@ var _ = Describe("StepStartPortForward", func() {
 		})
 
 		It("listens on the loopback address and an allocated port by default", func() {
-			step.Config.SSHHost = ""
+			step.Config.Comm.SSHHost = ""
 			step.Config.SSHLocalPort = 0
 
 			action := step.Run(context.Background(), state)
@@ -150,7 +151,7 @@ var _ = Describe("StepStartPortForward", func() {
 		})
 
 		It("halts when the forwarding address cannot be resolved", func() {
-			step.Config.SSHHost = "invalid host name"
+			step.Config.Comm.SSHHost = "invalid host name"
 
 			action := step.Run(context.Background(), state)
 			Expect(action).To(Equal(multistep.ActionHalt))
@@ -175,17 +176,27 @@ var _ = Describe("StepStartPortForward", func() {
 		})
 
 		It("works with WinRM configuration", func() {
-			step.Config.Communicator = "winrm"
-			step.Config.WinRMHost = "127.0.0.1"
-			step.Config.WinRMLocalPort = 5985
-			step.Config.WinRMRemotePort = 5985
+			step.Config.Comm = communicator.Config{
+				Type:  "winrm",
+				WinRM: communicator.WinRM{WinRMHost: "127.0.0.1", WinRMPort: 5985},
+			}
+			step.Config.WinRMLocalPort = 5000
 			step.Comm = &communicator.Config{Type: "winrm"}
 
 			action := step.Run(context.Background(), state)
 			Expect(action).To(Equal(multistep.ActionContinue))
 			Expect(mockFwd.called).To(BeTrue())
+			Expect(mockFwd.port).To(Equal(common.ForwardedPort{Local: 5000, Remote: 5985, Protocol: common.ProtocolTCP}))
 			Expect(step.Comm.WinRMHost).To(Equal("127.0.0.1"))
-			Expect(step.Comm.WinRMPort).To(Equal(5985))
+			Expect(step.Comm.WinRMPort).To(Equal(5000))
+		})
+
+		It("does nothing without an SSH or WinRM communicator", func() {
+			step.Config.Comm = communicator.Config{Type: "none"}
+
+			action := step.Run(context.Background(), state)
+			Expect(action).To(Equal(multistep.ActionContinue))
+			Expect(mockFwd.called).To(BeFalse())
 		})
 	})
 

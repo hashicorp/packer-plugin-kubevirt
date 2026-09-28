@@ -5,7 +5,7 @@ packer {
   required_plugins {
     kubevirt = {
       source  = "github.com/hashicorp/kubevirt"
-      version = ">= 0.8.0"
+      version = ">= 1.0.0"
     }
   }
 }
@@ -54,13 +54,11 @@ source "kubevirt-iso" "windows" {
   installation_wait_timeout = "20m"    # Timeout for installation to complete
 
   # WinRM configuration
-  communicator       = "winrm"
-  winrm_host         = "127.0.0.1"
-  winrm_local_port   = 5000
-  winrm_remote_port  = 5985
-  winrm_username     = "Administrator"
-  winrm_password     = "shadowman"
-  winrm_wait_timeout = "25m"
+  # The builder connects through a port forward on 127.0.0.1 and a free local port.
+  communicator   = "winrm"
+  winrm_username = "Administrator"
+  winrm_password = "shadowman"
+  winrm_timeout  = "25m"
 }
 
 build {

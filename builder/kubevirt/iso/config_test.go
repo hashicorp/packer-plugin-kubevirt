@@ -4,12 +4,18 @@
 package iso_test
 
 import (
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/pem"
+	"os"
 	"os/user"
 	"path/filepath"
 	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"golang.org/x/crypto/ssh"
 
 	"github.com/hashicorp/packer-plugin-kubevirt/builder/kubevirt/iso"
 )
@@ -86,8 +92,7 @@ var _ = Describe("Config", func() {
 			Expect(c.DiskBus).To(Equal("scsi"))
 			Expect(c.InstanceTypeKind).To(Equal("virtualmachineclusterinstancetype"))
 			Expect(c.PreferenceKind).To(Equal("virtualmachineclusterpreference"))
-			Expect(c.SSHRemotePort).To(Equal(22))
-			Expect(c.WinRMRemotePort).To(Equal(5985))
+			Expect(c.Comm.Type).To(Equal("none"))
 		})
 
 		It("accepts network names that KubeVirt accepts", func() {
@@ -119,7 +124,7 @@ var _ = Describe("Config", func() {
 
 		It("is optional with a communicator", func() {
 			c := &iso.Config{}
-			raw := validRawConfig(map[string]interface{}{"communicator": "ssh"})
+			raw := validRawConfig(map[string]interface{}{"communicator": "ssh", "ssh_username": "fedora"})
 			delete(raw, "installation_wait_timeout")
 			_, err := c.Prepare(raw)
 			Expect(err).NotTo(HaveOccurred())
@@ -129,6 +134,110 @@ var _ = Describe("Config", func() {
 			c := &iso.Config{}
 			_, err := c.Prepare(validRawConfig(map[string]interface{}{"installation_wait_timeout": "-5m"}))
 			Expect(err).To(MatchError(ContainSubstring("installation_wait_timeout must not be negative")))
+		})
+	})
+
+	Context("Prepare communicator", func() {
+		It("uses the SDK defaults for SSH", func() {
+			c := &iso.Config{}
+			warnings, err := c.Prepare(validRawConfig(map[string]interface{}{
+				"communicator": "ssh",
+				"ssh_username": "fedora",
+				"ssh_password": "fedora",
+			}))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(warnings).To(BeEmpty())
+			Expect(c.Comm.SSHPort).To(Equal(22))
+			Expect(c.Comm.SSHTimeout).To(Equal(5 * time.Minute))
+		})
+
+		It("uses the SDK defaults for WinRM", func() {
+			c := &iso.Config{}
+			_, err := c.Prepare(validRawConfig(map[string]interface{}{
+				"communicator":   "winrm",
+				"winrm_username": "Administrator",
+			}))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(c.Comm.WinRMPort).To(Equal(5985))
+			Expect(c.Comm.WinRMTimeout).To(Equal(30 * time.Minute))
+		})
+
+		It("reports communicator errors at validation time", func() {
+			c := &iso.Config{}
+			_, err := c.Prepare(validRawConfig(map[string]interface{}{"communicator": "ssh"}))
+			Expect(err).To(MatchError(ContainSubstring("An ssh_username must be specified")))
+		})
+
+		It("rejects communicators the builder cannot connect with", func() {
+			c := &iso.Config{}
+			_, err := c.Prepare(validRawConfig(map[string]interface{}{"communicator": "docker"}))
+			Expect(err).To(MatchError(ContainSubstring("communicator \"docker\" is not supported")))
+		})
+
+		It("accepts an SSH private key", func() {
+			_, key, err := ed25519.GenerateKey(rand.Reader)
+			Expect(err).NotTo(HaveOccurred())
+			block, err := ssh.MarshalPrivateKey(key, "")
+			Expect(err).NotTo(HaveOccurred())
+			keyFile := filepath.Join(GinkgoT().TempDir(), "id_ed25519")
+			Expect(os.WriteFile(keyFile, pem.EncodeToMemory(block), 0o600)).To(Succeed())
+
+			c := &iso.Config{}
+			_, err = c.Prepare(validRawConfig(map[string]interface{}{
+				"communicator":         "ssh",
+				"ssh_username":         "fedora",
+				"ssh_private_key_file": keyFile,
+			}))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(c.Comm.SSHPrivateKeyFile).To(Equal(keyFile))
+		})
+
+		It("maps the deprecated SSH options and warns about them", func() {
+			c := &iso.Config{}
+			warnings, err := c.Prepare(validRawConfig(map[string]interface{}{
+				"communicator":     "ssh",
+				"ssh_username":     "fedora",
+				"ssh_remote_port":  2222,
+				"ssh_wait_timeout": "20m",
+			}))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(warnings).To(ConsistOf(
+				"ssh_remote_port is deprecated, use ssh_port instead",
+				"ssh_wait_timeout is deprecated, use ssh_timeout instead",
+			))
+			Expect(c.Comm.SSHPort).To(Equal(2222))
+			Expect(c.Comm.SSHTimeout).To(Equal(20 * time.Minute))
+			// Like before the SDK configuration was used, and like ssh_timeout.
+			Expect(c.Comm.SSHHandshakeAttempts).To(Equal(0))
+		})
+
+		It("maps the deprecated WinRM options and warns about them", func() {
+			c := &iso.Config{}
+			warnings, err := c.Prepare(validRawConfig(map[string]interface{}{
+				"communicator":       "winrm",
+				"winrm_username":     "Administrator",
+				"winrm_remote_port":  5986,
+				"winrm_wait_timeout": "25m",
+			}))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(warnings).To(ConsistOf(
+				"winrm_remote_port is deprecated, use winrm_port instead",
+				"winrm_wait_timeout is deprecated, use winrm_timeout instead",
+			))
+			Expect(c.Comm.WinRMPort).To(Equal(5986))
+			Expect(c.Comm.WinRMTimeout).To(Equal(25 * time.Minute))
+		})
+
+		It("prefers the SDK options over the deprecated ones", func() {
+			c := &iso.Config{}
+			_, err := c.Prepare(validRawConfig(map[string]interface{}{
+				"communicator":    "ssh",
+				"ssh_username":    "fedora",
+				"ssh_port":        22,
+				"ssh_remote_port": 2222,
+			}))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(c.Comm.SSHPort).To(Equal(22))
 		})
 	})
 

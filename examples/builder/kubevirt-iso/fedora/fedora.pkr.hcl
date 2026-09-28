@@ -5,7 +5,7 @@ packer {
   required_plugins {
     kubevirt = {
       source  = "github.com/hashicorp/kubevirt"
-      version = ">= 0.8.0"
+      version = ">= 1.0.0"
     }
   }
 }
@@ -66,13 +66,11 @@ source "kubevirt-iso" "fedora" {
   installation_wait_timeout = "15m"     # Timeout for installation to complete
 
   # SSH configuration
-  communicator      = "ssh"
-  ssh_host          = "127.0.0.1"
-  ssh_local_port    = 2020
-  ssh_remote_port   = 22
-  ssh_username      = "user"
-  ssh_password      = "root"
-  ssh_wait_timeout  = "20m"
+  # The builder connects through a port forward on 127.0.0.1 and a free local port.
+  communicator = "ssh"
+  ssh_username = "user"
+  ssh_password = "root"
+  ssh_timeout  = "20m"
 }
 
 build {

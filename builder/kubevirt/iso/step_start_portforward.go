@@ -45,22 +45,22 @@ type PortForwarderFactory func(kind, namespace, name string, resource common.Por
 func (s *StepStartPortForward) Run(ctx context.Context, state multistep.StateBag) multistep.StepAction {
 	var host string
 	var localPort int
-	var remotePort int
 
 	ui := state.Get("ui").(packer.Ui)
 	name := s.Config.Name
 	namespace := s.Config.Namespace
+	remotePort := s.Config.Comm.Port()
 
-	if s.Config.Communicator == "ssh" {
-		host = s.Config.SSHHost
+	switch s.Config.Comm.Type {
+	case "ssh":
+		host = s.Config.Comm.SSHHost
 		localPort = s.Config.SSHLocalPort
-		remotePort = s.Config.SSHRemotePort
-	}
-
-	if s.Config.Communicator == "winrm" {
-		host = s.Config.WinRMHost
+	case "winrm":
+		host = s.Config.Comm.WinRMHost
 		localPort = s.Config.WinRMLocalPort
-		remotePort = s.Config.WinRMRemotePort
+	default:
+		log.Printf("[INFO] communicator %q does not need port forwarding", s.Config.Comm.Type)
+		return multistep.ActionContinue
 	}
 
 	if host == "" {
