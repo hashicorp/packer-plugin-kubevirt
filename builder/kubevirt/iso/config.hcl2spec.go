@@ -34,7 +34,7 @@ type FlatConfig struct {
 	MediaLabel              *string           `mapstructure:"media_label" required:"false" cty:"media_label" hcl:"media_label"`
 	BootCommand             []string          `mapstructure:"boot_command" required:"false" cty:"boot_command" hcl:"boot_command"`
 	BootWait                *string           `mapstructure:"boot_wait" required:"false" cty:"boot_wait" hcl:"boot_wait"`
-	InstallationWaitTimeout *string           `mapstructure:"installation_wait_timeout" required:"true" cty:"installation_wait_timeout" hcl:"installation_wait_timeout"`
+	InstallationWaitTimeout *string           `mapstructure:"installation_wait_timeout" required:"false" cty:"installation_wait_timeout" hcl:"installation_wait_timeout"`
 	Communicator            *string           `mapstructure:"communicator" required:"false" cty:"communicator" hcl:"communicator"`
 	SSHHost                 *string           `mapstructure:"ssh_host" required:"false" cty:"ssh_host" hcl:"ssh_host"`
 	SSHLocalPort            *int              `mapstructure:"ssh_local_port" required:"false" cty:"ssh_local_port" hcl:"ssh_local_port"`
