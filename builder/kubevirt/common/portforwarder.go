@@ -24,6 +24,7 @@ import (
 	"io"
 	"net"
 	"strings"
+	"sync"
 
 	kvcorev1 "kubevirt.io/client-go/kubevirt/typed/core/v1"
 	"kubevirt.io/client-go/log"
@@ -41,6 +42,9 @@ type PortForward struct {
 type PortForwarder struct {
 	Kind, Namespace, Name string
 	Resource              PortforwardableResource
+
+	mu       sync.Mutex
+	listener net.Listener
 }
 
 type ForwardedPort struct {
@@ -53,16 +57,20 @@ type PortforwardableResource interface {
 	PortForward(name string, port int, protocol string) (kvcorev1.StreamInterface, error)
 }
 
-func (p *PortForwarder) StartForwarding(address *net.IPAddr, port ForwardedPort) error {
+// StartForwarding listens on the given local address and forwards every
+// accepted connection to the remote port of the resource. It returns the
+// address the listener is bound to, which carries the port allocated by the
+// operating system when port.Local is 0.
+func (p *PortForwarder) StartForwarding(address *net.IPAddr, port ForwardedPort) (net.Addr, error) {
 	log.Log.Infof("forwarding %s %s:%d to %d", port.Protocol, address, port.Local, port.Remote)
 
 	if port.Protocol == ProtocolTCP {
 		return p.StartForwardingTCP(address, port)
 	}
-	return errors.New("unknown protocol: " + port.Protocol)
+	return nil, errors.New("unknown protocol: " + port.Protocol)
 }
 
-func (p *PortForwarder) StartForwardingTCP(address *net.IPAddr, port ForwardedPort) error {
+func (p *PortForwarder) StartForwardingTCP(address *net.IPAddr, port ForwardedPort) (net.Addr, error) {
 	listener, err := net.ListenTCP(
 		port.Protocol,
 		&net.TCPAddr{
@@ -71,15 +79,36 @@ func (p *PortForwarder) StartForwardingTCP(address *net.IPAddr, port ForwardedPo
 			Port: port.Local,
 		})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
+	p.mu.Lock()
+	p.listener = listener
+	p.mu.Unlock()
+
 	go p.WaitForConnection(listener, port)
-	return nil
+	return listener.Addr(), nil
+}
+
+// Close stops accepting new connections. Tunnels that are already open are
+// left to finish on their own.
+func (p *PortForwarder) Close() error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.listener == nil {
+		return nil
+	}
+	err := p.listener.Close()
+	p.listener = nil
+	if errors.Is(err, net.ErrClosed) {
+		return nil
+	}
+	return err
 }
 
 func (p *PortForwarder) closeListener(listener net.Listener) {
-	if err := listener.Close(); err != nil {
+	if err := listener.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
 		log.Log.Errorf("error closing listener: %v", err)
 	}
 }
@@ -89,7 +118,9 @@ func (p *PortForwarder) WaitForConnection(listener net.Listener, port ForwardedP
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			log.Log.Errorf("error accepting connection: %v", err)
+			if !errors.Is(err, net.ErrClosed) {
+				log.Log.Errorf("error accepting connection: %v", err)
+			}
 			return
 		}
 		log.Log.Infof("opening new tcp tunnel to %d", port.Remote)

@@ -43,11 +43,14 @@
 - `communicator` (string) - Communicator is the type of communicator to use to connect to the VM.
   Supported values are "ssh" and "winrm".
 
-- `ssh_host` (string) - SSHHost is the hostname or IP address to use to connect via SSH.
+- `ssh_host` (string) - SSHHost is the local address the port forward to the VM listens on, and
+  that the SSH communicator connects to. Defaults to "127.0.0.1".
 
-- `ssh_local_port` (int) - SSHLocalPort is the local port to use to connect via SSH.
+- `ssh_local_port` (int) - SSHLocalPort is the local port the port forward to the VM listens on.
+  Defaults to a free port allocated by the operating system, so that
+  concurrent builds do not conflict.
 
-- `ssh_remote_port` (int) - SSHRemotePort is the remote port to use to connect via SSH.
+- `ssh_remote_port` (int) - SSHRemotePort is the port of the SSH service in the VM. Defaults to 22.
 
 - `ssh_username` (string) - SSHUsername is the username to use to connect via SSH.
 
@@ -55,11 +58,14 @@
 
 - `ssh_wait_timeout` (duration string | ex: "1h5m2s") - SSHWaitTimeout is the amount of time to wait for the SSH service to be available.
 
-- `winrm_host` (string) - WinRMHost is the hostname or IP address to use to connect via WinRM.
+- `winrm_host` (string) - WinRMHost is the local address the port forward to the VM listens on, and
+  that the WinRM communicator connects to. Defaults to "127.0.0.1".
 
-- `winrm_local_port` (int) - WinRMLocalPort is the local port to use to connect via WinRM.
+- `winrm_local_port` (int) - WinRMLocalPort is the local port the port forward to the VM listens on.
+  Defaults to a free port allocated by the operating system, so that
+  concurrent builds do not conflict.
 
-- `winrm_remote_port` (int) - WinRMRemotePort is the remote port to use to connect via WinRM.
+- `winrm_remote_port` (int) - WinRMRemotePort is the port of the WinRM service in the VM. Defaults to 5985.
 
 - `winrm_username` (string) - WinRMUsername is the username to use to connect via WinRM.
 

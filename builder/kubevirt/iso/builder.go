@@ -174,6 +174,7 @@ func (b *Builder) buildSSHSteps() ([]multistep.Step, []error) {
 			Config:        b.config,
 			Client:        b.client,
 			ForwarderFunc: DefaultPortForwarder,
+			Comm:          commConfig,
 		},
 		&communicator.StepConnect{
 			Config: commConfig,
@@ -190,7 +191,7 @@ func (b *Builder) buildSSHSteps() ([]multistep.Step, []error) {
 				}, nil
 			},
 			SSHPort: func(state multistep.StateBag) (int, error) {
-				return b.config.SSHLocalPort, nil
+				return commConfig.SSHPort, nil
 			},
 		},
 		&commonsteps.StepProvision{},
@@ -219,6 +220,7 @@ func (b *Builder) buildWinRMSteps() ([]multistep.Step, []error) {
 			Config:        b.config,
 			Client:        b.client,
 			ForwarderFunc: DefaultPortForwarder,
+			Comm:          commConfig,
 		},
 		&communicator.StepConnect{
 			Config: commConfig,
@@ -232,7 +234,7 @@ func (b *Builder) buildWinRMSteps() ([]multistep.Step, []error) {
 				}, nil
 			},
 			WinRMPort: func(state multistep.StateBag) (int, error) {
-				return b.config.WinRMLocalPort, nil
+				return commConfig.WinRMPort, nil
 			},
 		},
 		&commonsteps.StepProvision{},

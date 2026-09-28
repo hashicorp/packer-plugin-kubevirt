@@ -140,11 +140,14 @@ type Config struct {
 	// Communicator is the type of communicator to use to connect to the VM.
 	// Supported values are "ssh" and "winrm".
 	Communicator string `mapstructure:"communicator" required:"false"`
-	// SSHHost is the hostname or IP address to use to connect via SSH.
+	// SSHHost is the local address the port forward to the VM listens on, and
+	// that the SSH communicator connects to. Defaults to "127.0.0.1".
 	SSHHost string `mapstructure:"ssh_host" required:"false"`
-	// SSHLocalPort is the local port to use to connect via SSH.
+	// SSHLocalPort is the local port the port forward to the VM listens on.
+	// Defaults to a free port allocated by the operating system, so that
+	// concurrent builds do not conflict.
 	SSHLocalPort int `mapstructure:"ssh_local_port" required:"false"`
-	// SSHRemotePort is the remote port to use to connect via SSH.
+	// SSHRemotePort is the port of the SSH service in the VM. Defaults to 22.
 	SSHRemotePort int `mapstructure:"ssh_remote_port" required:"false"`
 	// SSHUsername is the username to use to connect via SSH.
 	SSHUsername string `mapstructure:"ssh_username" required:"false"`
@@ -152,11 +155,14 @@ type Config struct {
 	SSHPassword string `mapstructure:"ssh_password" required:"false"`
 	// SSHWaitTimeout is the amount of time to wait for the SSH service to be available.
 	SSHWaitTimeout time.Duration `mapstructure:"ssh_wait_timeout" required:"false"`
-	// WinRMHost is the hostname or IP address to use to connect via WinRM.
+	// WinRMHost is the local address the port forward to the VM listens on, and
+	// that the WinRM communicator connects to. Defaults to "127.0.0.1".
 	WinRMHost string `mapstructure:"winrm_host" required:"false"`
-	// WinRMLocalPort is the local port to use to connect via WinRM.
+	// WinRMLocalPort is the local port the port forward to the VM listens on.
+	// Defaults to a free port allocated by the operating system, so that
+	// concurrent builds do not conflict.
 	WinRMLocalPort int `mapstructure:"winrm_local_port" required:"false"`
-	// WinRMRemotePort is the remote port to use to connect via WinRM.
+	// WinRMRemotePort is the port of the WinRM service in the VM. Defaults to 5985.
 	WinRMRemotePort int `mapstructure:"winrm_remote_port" required:"false"`
 	// WinRMUsername is the username to use to connect via WinRM.
 	WinRMUsername string `mapstructure:"winrm_username" required:"false"`
@@ -274,6 +280,13 @@ func (c *Config) Prepare(raws ...interface{}) ([]string, error) {
 		errs = packersdk.MultiErrorAppend(errs, errors.New("installation_wait_timeout must not be negative"))
 	case c.InstallationWaitTimeout == 0 && c.Communicator != "ssh" && c.Communicator != "winrm":
 		errs = packersdk.MultiErrorAppend(errs, errors.New("installation_wait_timeout must be set when no communicator is configured"))
+	}
+
+	if c.SSHRemotePort == 0 {
+		c.SSHRemotePort = 22
+	}
+	if c.WinRMRemotePort == 0 {
+		c.WinRMRemotePort = 5985
 	}
 
 	networkNames := make(map[string]bool, len(c.Networks))

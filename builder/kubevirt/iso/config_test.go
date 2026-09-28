@@ -86,6 +86,8 @@ var _ = Describe("Config", func() {
 			Expect(c.DiskBus).To(Equal("scsi"))
 			Expect(c.InstanceTypeKind).To(Equal("virtualmachineclusterinstancetype"))
 			Expect(c.PreferenceKind).To(Equal("virtualmachineclusterpreference"))
+			Expect(c.SSHRemotePort).To(Equal(22))
+			Expect(c.WinRMRemotePort).To(Equal(5985))
 		})
 
 		It("accepts network names that KubeVirt accepts", func() {
