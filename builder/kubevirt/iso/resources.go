@@ -20,9 +20,13 @@ import (
 
 const immediateBindingAnnotation = "cdi.kubevirt.io/storage.bind.immediate.requested"
 
-func configMap(name string, mediaFiles []string) (*corev1.ConfigMap, error) {
-	data := make(map[string]string)
+func configMap(name string, mediaFiles []string, mediaContent map[string]string) (*corev1.ConfigMap, error) {
+	data := make(map[string]string, len(mediaContent))
 	binaryData := make(map[string][]byte)
+
+	for filename, content := range mediaContent {
+		data[filename] = content
+	}
 
 	for _, path := range mediaFiles {
 		content, err := os.ReadFile(path)

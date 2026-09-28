@@ -25,7 +25,20 @@
   file is named after its base name. The file names must therefore be unique, and
   the files must add up to at most 1 MiB.
 
-- `media_label` (string) - MediaLabel is the volume label of the disk that holds the `media_files`.
+- `media_content` (map[string]string) - MediaContent is a map of file names to file contents to add to the media disk,
+  alongside `media_files`. This is useful to render installer configuration from
+  the template, for example with the `templatefile` function:
+  
+  ```hcl
+  media_content = {
+    "ks.cfg" = templatefile("ks.cfg.pkrtpl", { password = var.password })
+  }
+  ```
+  
+  The content is used as is, but Packer rejects content that is not valid
+  Go template syntax, such as Jinja templates: use `media_files` for it.
+
+- `media_label` (string) - MediaLabel is the volume label of the disk that holds the `media_files` and `media_content`.
   Different installers discover their configuration through different labels, e.g.
   "OEMDRV" for Anaconda kickstart (RHEL, Fedora) or "cidata" for cloud-init
   NoCloud / Subiquity autoinstall (Ubuntu). Only applies when `os_type` is "linux".

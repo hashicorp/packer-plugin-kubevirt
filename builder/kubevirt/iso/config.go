@@ -9,9 +9,11 @@ package iso
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -142,7 +144,20 @@ type Config struct {
 	// file is named after its base name. The file names must therefore be unique, and
 	// the files must add up to at most 1 MiB.
 	MediaFiles []string `mapstructure:"media_files" required:"false"`
-	// MediaLabel is the volume label of the disk that holds the `media_files`.
+	// MediaContent is a map of file names to file contents to add to the media disk,
+	// alongside `media_files`. This is useful to render installer configuration from
+	// the template, for example with the `templatefile` function:
+	//
+	// ```hcl
+	// media_content = {
+	//   "ks.cfg" = templatefile("ks.cfg.pkrtpl", { password = var.password })
+	// }
+	// ```
+	//
+	// The content is used as is, but Packer rejects content that is not valid
+	// Go template syntax, such as Jinja templates: use `media_files` for it.
+	MediaContent map[string]string `mapstructure:"media_content" required:"false"`
+	// MediaLabel is the volume label of the disk that holds the `media_files` and `media_content`.
 	// Different installers discover their configuration through different labels, e.g.
 	// "OEMDRV" for Anaconda kickstart (RHEL, Fedora) or "cidata" for cloud-init
 	// NoCloud / Subiquity autoinstall (Ubuntu). Only applies when `os_type` is "linux".
@@ -201,6 +216,10 @@ func (c *Config) Prepare(raws ...interface{}) ([]string, error) {
 		PluginType:         "builder.kubevirt.iso",
 		Interpolate:        true,
 		InterpolateContext: &c.ctx,
+		InterpolateFilter: &interpolate.RenderFilter{
+			// Keep the media content as is, like the content of media_files.
+			Exclude: []string{"media_content"},
+		},
 	}, raws...)
 	if err != nil {
 		return nil, err
@@ -287,7 +306,7 @@ func (c *Config) Prepare(raws ...interface{}) ([]string, error) {
 		errs = packersdk.MultiErrorAppend(errs, validateBootCommand(c.BootCommand)...)
 	}
 
-	errs = packersdk.MultiErrorAppend(errs, validateMediaFiles(c.MediaFiles)...)
+	errs = packersdk.MultiErrorAppend(errs, validateMedia(c.MediaFiles, c.MediaContent)...)
 
 	// Keep the historical behaviour of this builder, which only connected to
 	// the VM when a communicator was explicitly configured.
@@ -432,9 +451,9 @@ func validateBootCommand(bootCommand []string) []error {
 // maxMediaSize is the maximum size of the data stored in a ConfigMap.
 const maxMediaSize = 1024 * 1024
 
-// validateMediaFiles checks that the media files can be stored in the
+// validateMedia checks that the media files and content can be stored in the
 // ConfigMap backing the media disk, where each file is keyed by its name.
-func validateMediaFiles(paths []string) []error {
+func validateMedia(paths []string, content map[string]string) []error {
 	var errs []error
 	var totalSize int64
 	names := make(map[string]string, len(paths))
@@ -462,8 +481,19 @@ func validateMediaFiles(paths []string) []error {
 		}
 	}
 
+	for _, name := range slices.Sorted(maps.Keys(content)) {
+		totalSize += int64(len(content[name]))
+
+		if path, ok := names[name]; ok {
+			errs = append(errs, fmt.Errorf("media_content: %q is also provided by media_files (%q)", name, path))
+		}
+		for _, msg := range validation.IsConfigMapKey(name) {
+			errs = append(errs, fmt.Errorf("media_content: the file name %q is invalid: %s", name, msg))
+		}
+	}
+
 	if totalSize > maxMediaSize {
-		errs = append(errs, fmt.Errorf("media_files: the files add up to %d bytes, but a ConfigMap can hold at most %d bytes", totalSize, maxMediaSize))
+		errs = append(errs, fmt.Errorf("the media files add up to %d bytes, but a ConfigMap can hold at most %d bytes", totalSize, maxMediaSize))
 	}
 	return errs
 }

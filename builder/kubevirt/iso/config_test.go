@@ -101,6 +101,53 @@ var _ = Describe("Config", func() {
 				return []string{writeFile(filepath.Join(dir, "big.iso"), 1024*1024+1)}
 			}, "a ConfigMap can hold at most 1048576 bytes"),
 		)
+
+		It("accepts media_content alongside media_files", func() {
+			c := &iso.Config{}
+			_, err := c.Prepare(validRawConfig(map[string]interface{}{
+				"media_files":   []string{writeFile(filepath.Join(dir, "ks.cfg"), 10)},
+				"media_content": map[string]string{"user-data": "#cloud-config", "meta-data": ""},
+			}))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(c.MediaContent).To(HaveKeyWithValue("user-data", "#cloud-config"))
+		})
+
+		It("keeps media_content as is", func() {
+			content := "%post\npodman ps --format '{{ .Names }}'\n%end\n"
+
+			c := &iso.Config{}
+			_, err := c.Prepare(validRawConfig(map[string]interface{}{
+				"media_content": map[string]string{"ks.cfg": content},
+			}))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(c.MediaContent).To(HaveKeyWithValue("ks.cfg", content))
+		})
+
+		It("rejects media_content that clashes with media_files", func() {
+			c := &iso.Config{}
+			_, err := c.Prepare(validRawConfig(map[string]interface{}{
+				"media_files":   []string{writeFile(filepath.Join(dir, "ks.cfg"), 10)},
+				"media_content": map[string]string{"ks.cfg": "text"},
+			}))
+			Expect(err).To(MatchError(ContainSubstring("media_content: \"ks.cfg\" is also provided by media_files")))
+		})
+
+		It("rejects invalid media_content file names", func() {
+			c := &iso.Config{}
+			_, err := c.Prepare(validRawConfig(map[string]interface{}{
+				"media_content": map[string]string{"../ks.cfg": "text"},
+			}))
+			Expect(err).To(MatchError(ContainSubstring("media_content: the file name \"../ks.cfg\" is invalid")))
+		})
+
+		It("counts media_content towards the ConfigMap size limit", func() {
+			c := &iso.Config{}
+			_, err := c.Prepare(validRawConfig(map[string]interface{}{
+				"media_files":   []string{writeFile(filepath.Join(dir, "big.iso"), 1024*1024)},
+				"media_content": map[string]string{"ks.cfg": "x"},
+			}))
+			Expect(err).To(MatchError(ContainSubstring("a ConfigMap can hold at most 1048576 bytes")))
+		})
 	})
 
 	Context("Prepare kube_config", func() {

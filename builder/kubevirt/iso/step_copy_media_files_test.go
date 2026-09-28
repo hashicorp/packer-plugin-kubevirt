@@ -77,6 +77,18 @@ var _ = Describe("StepCopyMediaFiles", func() {
 			Expect(cm.Data).To(HaveKeyWithValue("file2.iso", "fake iso data 2"))
 		})
 
+		It("adds media_content to the ConfigMap", func() {
+			step.Config.MediaContent = map[string]string{"user-data": "#cloud-config\n"}
+
+			action := step.Run(context.Background(), state)
+			Expect(action).To(Equal(multistep.ActionContinue))
+
+			cm, err := kubeClient.CoreV1().ConfigMaps(namespace).Get(context.Background(), name, metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(cm.Data).To(HaveKeyWithValue("user-data", "#cloud-config\n"))
+			Expect(cm.Data).To(HaveKeyWithValue("file1.iso", "fake iso data 1"))
+		})
+
 		It("stores files that are not UTF-8 as binary data", func() {
 			driver := filepath.Join(GinkgoT().TempDir(), "viostor.cat")
 			content := []byte{0x30, 0x82, 0xff, 0xfe, 0x00}
