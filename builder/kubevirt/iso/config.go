@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 //go:generate packer-sdc struct-markdown
-//go:generate packer-sdc mapstructure-to-hcl2 -type Config,Network,NetworkSource,PodNetwork,MultusNetwork,PortForwardConfig
+//go:generate packer-sdc mapstructure-to-hcl2 -type Config,Network,NetworkSource,PodNetwork,MultusNetwork,PortForwardConfig,StorageConfig
 
 package iso
 
@@ -25,6 +25,7 @@ import (
 	"github.com/hashicorp/packer-plugin-sdk/template/config"
 	"github.com/hashicorp/packer-plugin-sdk/template/interpolate"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/validation"
 
@@ -97,6 +98,20 @@ type PortForwardConfig struct {
 	// when using the WinRM communicator. Defaults to a free port allocated by
 	// the operating system, so that concurrent builds do not conflict.
 	WinRMLocalPort int `mapstructure:"winrm_local_port" required:"false"`
+}
+
+// The following options configure the persistent volumes created by the builder:
+// the root disk of the temporary VM and the bootable volume cloned from it.
+type StorageConfig struct {
+	// StorageClassName is the name of the StorageClass of the volumes.
+	// Defaults to the default StorageClass of the cluster.
+	StorageClassName string `mapstructure:"storage_class_name" required:"false"`
+	// AccessMode is the access mode of the volumes.
+	// Supported values are "ReadWriteOnce" and "ReadWriteMany". Defaults to "ReadWriteOnce".
+	AccessMode string `mapstructure:"access_mode" required:"false"`
+	// VolumeMode is the volume mode of the volumes.
+	// Supported values are "Filesystem" and "Block". Defaults to "Filesystem".
+	VolumeMode string `mapstructure:"volume_mode" required:"false"`
 }
 
 type Config struct {
@@ -189,6 +204,8 @@ type Config struct {
 	// to the VM once this time has elapsed.
 	InstallationWaitTimeout time.Duration `mapstructure:"installation_wait_timeout" required:"false"`
 
+	StorageConfig `mapstructure:",squash"`
+
 	Comm              communicator.Config `mapstructure:",squash"`
 	PortForwardConfig `mapstructure:",squash"`
 
@@ -257,6 +274,20 @@ func (c *Config) Prepare(raws ...interface{}) ([]string, error) {
 		errs = packersdk.MultiErrorAppend(errs, fmt.Errorf("disk_size %q is not a valid Kubernetes quantity (e.g. \"10Gi\"): %w", c.DiskSize, err))
 	} else if size.Sign() <= 0 {
 		errs = packersdk.MultiErrorAppend(errs, fmt.Errorf("disk_size %q must be greater than zero", c.DiskSize))
+	}
+
+	if c.StorageClassName != "" {
+		errs = packersdk.MultiErrorAppend(errs, validateName("storage_class_name", c.StorageClassName, validation.IsDNS1123Subdomain)...)
+	}
+	switch corev1.PersistentVolumeAccessMode(c.AccessMode) {
+	case "", corev1.ReadWriteOnce, corev1.ReadWriteMany:
+	default:
+		errs = packersdk.MultiErrorAppend(errs, fmt.Errorf("access_mode %q is not supported, use %q or %q", c.AccessMode, corev1.ReadWriteOnce, corev1.ReadWriteMany))
+	}
+	switch corev1.PersistentVolumeMode(c.VolumeMode) {
+	case "", corev1.PersistentVolumeFilesystem, corev1.PersistentVolumeBlock:
+	default:
+		errs = packersdk.MultiErrorAppend(errs, fmt.Errorf("volume_mode %q is not supported, use %q or %q", c.VolumeMode, corev1.PersistentVolumeFilesystem, corev1.PersistentVolumeBlock))
 	}
 
 	if c.InstanceType == "" {

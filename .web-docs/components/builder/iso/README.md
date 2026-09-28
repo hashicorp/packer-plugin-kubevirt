@@ -149,6 +149,30 @@ build {
 <!-- End of code generated from the comments of the Config struct in builder/kubevirt/iso/config.go; -->
 
 
+### Storage Configuration
+
+<!-- Code generated from the comments of the StorageConfig struct in builder/kubevirt/iso/config.go; DO NOT EDIT MANUALLY -->
+
+The following options configure the persistent volumes created by the builder:
+the root disk of the temporary VM and the bootable volume cloned from it.
+
+<!-- End of code generated from the comments of the StorageConfig struct in builder/kubevirt/iso/config.go; -->
+
+
+<!-- Code generated from the comments of the StorageConfig struct in builder/kubevirt/iso/config.go; DO NOT EDIT MANUALLY -->
+
+- `storage_class_name` (string) - StorageClassName is the name of the StorageClass of the volumes.
+  Defaults to the default StorageClass of the cluster.
+
+- `access_mode` (string) - AccessMode is the access mode of the volumes.
+  Supported values are "ReadWriteOnce" and "ReadWriteMany". Defaults to "ReadWriteOnce".
+
+- `volume_mode` (string) - VolumeMode is the volume mode of the volumes.
+  Supported values are "Filesystem" and "Block". Defaults to "Filesystem".
+
+<!-- End of code generated from the comments of the StorageConfig struct in builder/kubevirt/iso/config.go; -->
+
+
 ### Network Configuration
 
 <!-- Code generated from the comments of the Network struct in builder/kubevirt/iso/config.go; DO NOT EDIT MANUALLY -->

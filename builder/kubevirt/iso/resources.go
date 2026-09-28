@@ -65,7 +65,8 @@ func virtualMachine(
 	diskBus,
 	mediaLabel,
 	virtioContainerImage string,
-	networks []Network) *v1.VirtualMachine {
+	networks []Network,
+	storage StorageConfig) *v1.VirtualMachine {
 	var disks []v1.Disk
 	var volumes []v1.Volume
 
@@ -118,14 +119,7 @@ func virtualMachine(
 						Name: name + "-rootdisk",
 					},
 					Spec: cdiv1.DataVolumeSpec{
-						PVC: &corev1.PersistentVolumeClaimSpec{
-							Resources: corev1.VolumeResourceRequirements{
-								Requests: corev1.ResourceList{
-									corev1.ResourceName(corev1.ResourceStorage): resource.MustParse(diskSize),
-								},
-							},
-							AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-						},
+						PVC: persistentVolumeClaimSpec(diskSize, storage),
 						Source: &cdiv1.DataVolumeSource{
 							Blank: &cdiv1.DataVolumeBlankImage{},
 						},
@@ -148,7 +142,7 @@ func virtualMachine(
 	}
 }
 
-func cloneVolume(name, namespace, diskSize string) *cdiv1.DataVolume {
+func cloneVolume(name, namespace, diskSize string, storage StorageConfig) *cdiv1.DataVolume {
 	return &cdiv1.DataVolume{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: cdiv1.CDIGroupVersionKind.GroupVersion().String(),
@@ -167,16 +161,35 @@ func cloneVolume(name, namespace, diskSize string) *cdiv1.DataVolume {
 					Namespace: namespace,
 				},
 			},
-			PVC: &corev1.PersistentVolumeClaimSpec{
-				Resources: corev1.VolumeResourceRequirements{
-					Requests: corev1.ResourceList{
-						corev1.ResourceName(corev1.ResourceStorage): resource.MustParse(diskSize),
-					},
-				},
-				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-			},
+			PVC: persistentVolumeClaimSpec(diskSize, storage),
 		},
 	}
+}
+
+// persistentVolumeClaimSpec returns the claim of the root disk and of the
+// bootable volume cloned from it. Unset options keep the historical defaults:
+// ReadWriteOnce, and the default storage class and volume mode.
+func persistentVolumeClaimSpec(diskSize string, storage StorageConfig) *corev1.PersistentVolumeClaimSpec {
+	accessMode := corev1.ReadWriteOnce
+	if storage.AccessMode != "" {
+		accessMode = corev1.PersistentVolumeAccessMode(storage.AccessMode)
+	}
+
+	spec := &corev1.PersistentVolumeClaimSpec{
+		Resources: corev1.VolumeResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceStorage: resource.MustParse(diskSize),
+			},
+		},
+		AccessModes: []corev1.PersistentVolumeAccessMode{accessMode},
+	}
+	if storage.StorageClassName != "" {
+		spec.StorageClassName = ptr.To(storage.StorageClassName)
+	}
+	if storage.VolumeMode != "" {
+		spec.VolumeMode = ptr.To(corev1.PersistentVolumeMode(storage.VolumeMode))
+	}
+	return spec
 }
 
 func sourceVolume(name, namespace, instanceType, instanceTypeKind, preferenceName, preferenceKind string) *cdiv1.DataSource {
