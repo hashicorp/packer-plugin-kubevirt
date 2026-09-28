@@ -100,22 +100,35 @@ var _ = Describe("StepCopyMediaFiles", func() {
 	})
 
 	Context("Cleanup", func() {
-		It("deletes ConfigMap successfully", func() {
-			// Pre-create ConfigMap
+		It("deletes the ConfigMap it created", func() {
+			action := step.Run(context.Background(), state)
+			Expect(action).To(Equal(multistep.ActionContinue))
+
+			step.Cleanup(state)
+
+			_, err := kubeClient.CoreV1().ConfigMaps(namespace).Get(context.Background(), name, metav1.GetOptions{})
+			Expect(errors.IsNotFound(err)).To(BeTrue())
+		})
+
+		It("does not delete a pre-existing ConfigMap with the same name", func() {
 			_, err := kubeClient.CoreV1().ConfigMaps(namespace).Create(context.Background(), &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Data: map[string]string{"file1.iso": "data"},
+				Data: map[string]string{"user-data": "unrelated"},
 			}, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
-			// Cleanup
+			action := step.Run(context.Background(), state)
+			Expect(action).To(Equal(multistep.ActionHalt))
+			Expect(state.Get("error")).To(MatchError(ContainSubstring("already exists")))
+
 			step.Cleanup(state)
 
-			_, err = kubeClient.CoreV1().ConfigMaps(namespace).Get(context.Background(), name, metav1.GetOptions{})
-			Expect(err).To(HaveOccurred()) // Should be deleted
+			cm, err := kubeClient.CoreV1().ConfigMaps(namespace).Get(context.Background(), name, metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(cm.Data).To(HaveKeyWithValue("user-data", "unrelated"))
 		})
 	})
 })

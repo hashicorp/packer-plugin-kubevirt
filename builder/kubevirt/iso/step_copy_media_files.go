@@ -17,6 +17,8 @@ import (
 type StepCopyMediaFiles struct {
 	Config Config
 	Client kubernetes.Interface
+
+	created bool
 }
 
 func (s *StepCopyMediaFiles) Run(ctx context.Context, state multistep.StateBag) multistep.StepAction {
@@ -36,10 +38,17 @@ func (s *StepCopyMediaFiles) Run(ctx context.Context, state multistep.StateBag) 
 	if err != nil {
 		return halt(state, fmt.Errorf("failed to create the ConfigMap (%s/%s): %w", namespace, name, err))
 	}
+	s.created = true
 	return multistep.ActionContinue
 }
 
 func (s *StepCopyMediaFiles) Cleanup(state multistep.StateBag) {
+	// Never delete a ConfigMap that this build did not create, e.g. one that
+	// already existed with the same name and made the creation fail.
+	if !s.created {
+		return
+	}
+
 	ui := state.Get("ui").(packer.Ui)
 	name := s.Config.Name
 	namespace := s.Config.Namespace

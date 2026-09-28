@@ -21,6 +21,8 @@ import (
 type StepCreateVirtualMachine struct {
 	Config Config
 	Client kubecli.KubevirtClient
+
+	created bool
 }
 
 func (s *StepCreateVirtualMachine) Run(ctx context.Context, state multistep.StateBag) multistep.StepAction {
@@ -61,6 +63,7 @@ func (s *StepCreateVirtualMachine) Run(ctx context.Context, state multistep.Stat
 	if err != nil {
 		return halt(state, fmt.Errorf("failed to create the VirtualMachine (%s/%s): %w", namespace, name, err))
 	}
+	s.created = true
 
 	if err := s.waitUntilVirtualMachineReady(ctx); err != nil {
 		return halt(state, fmt.Errorf("the VirtualMachine (%s/%s) did not become ready: %w", namespace, name, err))
@@ -69,6 +72,12 @@ func (s *StepCreateVirtualMachine) Run(ctx context.Context, state multistep.Stat
 }
 
 func (s *StepCreateVirtualMachine) Cleanup(state multistep.StateBag) {
+	// Never delete a VirtualMachine that this build did not create, e.g. one
+	// that already existed with the same name and made the creation fail.
+	if !s.created {
+		return
+	}
+
 	ui := state.Get("ui").(packer.Ui)
 	name := s.Config.Name
 	namespace := s.Config.Namespace
