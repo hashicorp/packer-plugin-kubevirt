@@ -39,7 +39,8 @@ build {
 
 <!-- Code generated from the comments of the Config struct in builder/kubevirt/iso/config.go; DO NOT EDIT MANUALLY -->
 
-- `kube_config` (string) - KubeConfig is the path to the kubeconfig file.
+- `kube_config` (string) - KubeConfig is the path to the kubeconfig file used to connect to the cluster.
+  A leading `~` is expanded to the home directory of the current user.
 
 - `name` (string) - Name is the name of the VM image.
 

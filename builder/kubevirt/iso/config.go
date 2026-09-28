@@ -15,6 +15,7 @@ import (
 	"github.com/hashicorp/packer-plugin-sdk/bootcommand"
 	"github.com/hashicorp/packer-plugin-sdk/common"
 	packersdk "github.com/hashicorp/packer-plugin-sdk/packer"
+	"github.com/hashicorp/packer-plugin-sdk/pathing"
 	"github.com/hashicorp/packer-plugin-sdk/template/config"
 	"github.com/hashicorp/packer-plugin-sdk/template/interpolate"
 
@@ -79,7 +80,8 @@ const (
 type Config struct {
 	common.PackerConfig `mapstructure:",squash"`
 
-	// KubeConfig is the path to the kubeconfig file.
+	// KubeConfig is the path to the kubeconfig file used to connect to the cluster.
+	// A leading `~` is expanded to the home directory of the current user.
 	KubeConfig string `mapstructure:"kube_config" required:"true"`
 	// Name is the name of the VM image.
 	Name string `mapstructure:"name" required:"true"`
@@ -190,6 +192,12 @@ func (c *Config) Prepare(raws ...interface{}) ([]string, error) {
 	}
 
 	var errs *packersdk.MultiError
+
+	if c.KubeConfig == "" {
+		errs = packersdk.MultiErrorAppend(errs, errors.New("kube_config must be specified"))
+	} else if c.KubeConfig, err = pathing.ExpandUser(c.KubeConfig); err != nil {
+		errs = packersdk.MultiErrorAppend(errs, fmt.Errorf("kube_config is invalid: %w", err))
+	}
 
 	errs = packersdk.MultiErrorAppend(errs, validateName("name", c.Name, validation.IsDNS1123Subdomain)...)
 	errs = packersdk.MultiErrorAppend(errs, validateName("namespace", c.Namespace, validation.IsDNS1123Label)...)

@@ -4,6 +4,8 @@
 package iso_test
 
 import (
+	"os/user"
+	"path/filepath"
 	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -53,6 +55,26 @@ var _ = Describe("Config", func() {
 		})
 	})
 
+	Context("Prepare kube_config", func() {
+		It("is required", func() {
+			c := &iso.Config{}
+			raw := validRawConfig(nil)
+			delete(raw, "kube_config")
+			_, err := c.Prepare(raw)
+			Expect(err).To(MatchError(ContainSubstring("kube_config must be specified")))
+		})
+
+		It("expands a leading ~ to the home directory", func() {
+			current, err := user.Current()
+			Expect(err).NotTo(HaveOccurred())
+
+			c := &iso.Config{}
+			_, err = c.Prepare(validRawConfig(map[string]interface{}{"kube_config": "~/.kube/config"}))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(c.KubeConfig).To(Equal(filepath.Join(current.HomeDir, ".kube", "config")))
+		})
+	})
+
 	Context("Prepare defaults", func() {
 		It("applies the documented defaults", func() {
 			c := &iso.Config{}
@@ -79,7 +101,7 @@ var _ = Describe("Config", func() {
 			c := &iso.Config{}
 			_, err := c.Prepare(map[string]interface{}{})
 			Expect(err).To(HaveOccurred())
-			for _, option := range []string{"name", "namespace", "iso_volume_name", "disk_size", "instance_type", "preference"} {
+			for _, option := range []string{"kube_config", "name", "namespace", "iso_volume_name", "disk_size", "instance_type", "preference"} {
 				Expect(err.Error()).To(ContainSubstring(option + " must be specified"))
 			}
 		})
