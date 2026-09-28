@@ -116,12 +116,16 @@ type Config struct {
 	// quantity, e.g. "10Gi".
 	DiskSize string `mapstructure:"disk_size" required:"true"`
 	// InstanceType is the name of the InstanceType resource to use in the temporary VM.
+	// It is also recorded on the resulting DataSource as its default instance type,
+	// which VMs created from it can infer.
 	InstanceType string `mapstructure:"instance_type" required:"true"`
 	// InstanceTypeKind is the kind of the InstanceType resource to use in the temporary VM.
 	// Supported values are "virtualmachineclusterinstancetype" and "virtualmachineinstancetype".
 	// Defaults to "virtualmachineclusterinstancetype".
 	InstanceTypeKind string `mapstructure:"instance_type_kind" required:"false"`
 	// Preference is the name of the Preference resource to use in the temporary VM.
+	// It is also recorded on the resulting DataSource as its default preference,
+	// which VMs created from it can infer.
 	Preference string `mapstructure:"preference" required:"true"`
 	// PreferenceKind is the kind of the Preference resource to use in the temporary VM.
 	// Supported values are "virtualmachineclusterpreference" and "virtualmachinepreference".
@@ -271,6 +275,19 @@ func (c *Config) Prepare(raws ...interface{}) ([]string, error) {
 	} else if !isSupportedKind(c.PreferenceKind, instancetypeapi.ClusterSingularPreferenceResourceName, instancetypeapi.SingularPreferenceResourceName) {
 		errs = packersdk.MultiErrorAppend(errs, fmt.Errorf("preference_kind %q is not supported, use %q or %q",
 			c.PreferenceKind, instancetypeapi.ClusterSingularPreferenceResourceName, instancetypeapi.SingularPreferenceResourceName))
+	}
+
+	// The instance type and preference are recorded as labels on the DataSource
+	// created at the end of the build, so check them before the installation.
+	if !c.SkipCreateImage {
+		for _, label := range []struct{ field, value string }{
+			{"instance_type", c.InstanceType},
+			{"preference", c.Preference},
+		} {
+			for _, msg := range validation.IsValidLabelValue(label.value) {
+				errs = packersdk.MultiErrorAppend(errs, fmt.Errorf("%s %q cannot be used as a DataSource label: %s", label.field, label.value, msg))
+			}
+		}
 	}
 
 	if c.OperatingSystemType == "" {

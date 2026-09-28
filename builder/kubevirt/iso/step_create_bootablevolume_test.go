@@ -107,6 +107,51 @@ var _ = Describe("StepCreateBootableVolume", func() {
 			Expect(state.Get("bootable_volume_name")).To(Equal("boot-dv"))
 		})
 
+		DescribeTable("labels the DataSource with the instance type and preference",
+			func(instanceTypeKind, preferenceKind string, expectedLabels map[string]string, unexpectedLabels []string) {
+				step.Config.InstanceTypeKind = instanceTypeKind
+				step.Config.PreferenceKind = preferenceKind
+
+				cdiClient.PrependReactor("create", "datavolumes", func(action testing.Action) (bool, runtime.Object, error) {
+					dv := action.(testing.CreateAction).GetObject().(*cdiv1beta1.DataVolume)
+					dv.Status.Phase = cdiv1beta1.Succeeded
+					return false, dv, nil
+				})
+				var created *cdiv1beta1.DataSource
+				cdiClient.PrependReactor("create", "datasources", func(action testing.Action) (bool, runtime.Object, error) {
+					created = action.(testing.CreateAction).GetObject().(*cdiv1beta1.DataSource)
+					return false, created, nil
+				})
+
+				Expect(step.Run(context.Background(), state)).To(Equal(multistep.ActionContinue))
+				Expect(created).NotTo(BeNil())
+				for key, value := range expectedLabels {
+					Expect(created.Labels).To(HaveKeyWithValue(key, value))
+				}
+				for _, key := range unexpectedLabels {
+					Expect(created.Labels).NotTo(HaveKey(key))
+				}
+			},
+			Entry("cluster-wide kinds rely on the KubeVirt default",
+				"virtualmachineclusterinstancetype", "virtualmachineclusterpreference",
+				map[string]string{
+					"instancetype.kubevirt.io/default-instancetype": "cx1.large",
+					"instancetype.kubevirt.io/default-preference":   "fedora",
+				},
+				[]string{"instancetype.kubevirt.io/default-instancetype-kind", "instancetype.kubevirt.io/default-preference-kind"},
+			),
+			Entry("namespaced kinds are recorded",
+				"virtualmachineinstancetype", "virtualmachinepreference",
+				map[string]string{
+					"instancetype.kubevirt.io/default-instancetype":      "cx1.large",
+					"instancetype.kubevirt.io/default-instancetype-kind": "virtualmachineinstancetype",
+					"instancetype.kubevirt.io/default-preference":        "fedora",
+					"instancetype.kubevirt.io/default-preference-kind":   "virtualmachinepreference",
+				},
+				nil,
+			),
+		)
+
 		It("halts when DataVolume creation fails", func() {
 			cdiClient.PrependReactor("create", "datavolumes", func(action testing.Action) (bool, runtime.Object, error) {
 				return true, nil, fmt.Errorf("boom: DV create failed")

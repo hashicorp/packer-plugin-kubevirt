@@ -179,18 +179,29 @@ func cloneVolume(name, namespace, diskSize string) *cdiv1.DataVolume {
 	}
 }
 
-func sourceVolume(name, namespace, instanceType, preferenceName string) *cdiv1.DataSource {
+func sourceVolume(name, namespace, instanceType, instanceTypeKind, preferenceName, preferenceKind string) *cdiv1.DataSource {
+	labels := map[string]string{
+		instancetypeapi.DefaultInstancetypeLabel: instanceType,
+		instancetypeapi.DefaultPreferenceLabel:   preferenceName,
+	}
+
+	// Without a kind label, KubeVirt looks up the cluster-wide resource when
+	// inferring the instance type and preference from the volume.
+	if instanceTypeKind != "" && !isSupportedKind(instanceTypeKind, instancetypeapi.ClusterSingularResourceName) {
+		labels[instancetypeapi.DefaultInstancetypeKindLabel] = instanceTypeKind
+	}
+	if preferenceKind != "" && !isSupportedKind(preferenceKind, instancetypeapi.ClusterSingularPreferenceResourceName) {
+		labels[instancetypeapi.DefaultPreferenceKindLabel] = preferenceKind
+	}
+
 	return &cdiv1.DataSource{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: cdiv1.CDIGroupVersionKind.GroupVersion().String(),
 			Kind:       "DataSource",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-			Labels: map[string]string{
-				"instancetype.kubevirt.io/default-instancetype": instanceType,
-				"instancetype.kubevirt.io/default-preference":   preferenceName,
-			},
+			Name:   name,
+			Labels: labels,
 		},
 		Spec: cdiv1.DataSourceSpec{
 			Source: cdiv1.DataSourceSource{

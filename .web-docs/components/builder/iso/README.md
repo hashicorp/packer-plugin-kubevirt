@@ -53,8 +53,12 @@ build {
   quantity, e.g. "10Gi".
 
 - `instance_type` (string) - InstanceType is the name of the InstanceType resource to use in the temporary VM.
+  It is also recorded on the resulting DataSource as its default instance type,
+  which VMs created from it can infer.
 
 - `preference` (string) - Preference is the name of the Preference resource to use in the temporary VM.
+  It is also recorded on the resulting DataSource as its default preference,
+  which VMs created from it can infer.
 
 <!-- End of code generated from the comments of the Config struct in builder/kubevirt/iso/config.go; -->
 
