@@ -97,6 +97,7 @@ var _ = Describe("StepStopVirtualMachine", func() {
 		It("halts when VM cannot be retrieved", func() {
 			action := step.Run(context.Background(), state)
 			Expect(action).To(Equal(multistep.ActionHalt))
+			Expect(state.Get("error")).To(MatchError(ContainSubstring("failed to get the VirtualMachine")))
 		})
 
 		It("halts when VM update fails", func() {
@@ -117,6 +118,7 @@ var _ = Describe("StepStopVirtualMachine", func() {
 
 			action := step.Run(context.Background(), state)
 			Expect(action).To(Equal(multistep.ActionHalt))
+			Expect(state.Get("error")).To(MatchError(ContainSubstring("simulated update error")))
 		})
 	})
 })

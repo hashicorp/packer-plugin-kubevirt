@@ -5,6 +5,7 @@ package iso
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/hashicorp/packer-plugin-sdk/multistep"
 	"github.com/hashicorp/packer-plugin-sdk/packer"
@@ -35,19 +36,16 @@ func (s *StepCreateBootableVolume) Run(ctx context.Context, state multistep.Stat
 
 	dv, err := s.Client.CdiClient().CdiV1beta1().DataVolumes(namespace).Create(ctx, cloneVolume, metav1.CreateOptions{})
 	if err != nil {
-		ui.Error(err.Error())
-		return multistep.ActionHalt
+		return halt(state, fmt.Errorf("failed to create the DataVolume (%s/%s): %w", namespace, name, err))
 	}
 
 	if err = WaitUntilDataVolumeSucceeded(ctx, s.Client, dv.Namespace, dv.Name); err != nil {
-		ui.Error(err.Error())
-		return multistep.ActionHalt
+		return halt(state, fmt.Errorf("the DataVolume (%s/%s) did not succeed: %w", namespace, name, err))
 	}
 
 	ds, err := s.Client.CdiClient().CdiV1beta1().DataSources(namespace).Create(ctx, sourceVolume, metav1.CreateOptions{})
 	if err != nil {
-		ui.Error(err.Error())
-		return multistep.ActionHalt
+		return halt(state, fmt.Errorf("failed to create the DataSource (%s/%s): %w", namespace, name, err))
 	}
 
 	state.Put("bootable_volume_name", ds.Name)

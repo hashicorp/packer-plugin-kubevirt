@@ -5,6 +5,7 @@ package iso
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/hashicorp/packer-plugin-sdk/multistep"
 	"github.com/hashicorp/packer-plugin-sdk/packer"
@@ -28,14 +29,12 @@ func (s *StepCopyMediaFiles) Run(ctx context.Context, state multistep.StateBag) 
 
 	configMap, err := configMap(name, mediaFiles)
 	if err != nil {
-		ui.Error(err.Error())
-		return multistep.ActionHalt
+		return halt(state, fmt.Errorf("failed to read the media files: %w", err))
 	}
 
 	_, err = s.Client.CoreV1().ConfigMaps(namespace).Create(ctx, configMap, metav1.CreateOptions{})
 	if err != nil {
-		ui.Error(err.Error())
-		return multistep.ActionHalt
+		return halt(state, fmt.Errorf("failed to create the ConfigMap (%s/%s): %w", namespace, name, err))
 	}
 	return multistep.ActionContinue
 }

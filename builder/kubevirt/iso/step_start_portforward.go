@@ -5,6 +5,7 @@ package iso
 
 import (
 	"context"
+	"fmt"
 	"net"
 
 	"github.com/hashicorp/packer-plugin-kubevirt/builder/kubevirt/common"
@@ -73,8 +74,7 @@ func (s *StepStartPortForward) Run(ctx context.Context, state multistep.StateBag
 		return multistep.ActionHalt
 	case err := <-errChan:
 		if err != nil {
-			ui.Error(err.Error())
-			return multistep.ActionHalt
+			return halt(state, fmt.Errorf("failed to start port forwarding to the VirtualMachine (%s/%s): %w", namespace, name, err))
 		}
 	}
 	return multistep.ActionContinue

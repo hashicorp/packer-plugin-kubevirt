@@ -5,6 +5,7 @@ package iso
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	ssh "golang.org/x/crypto/ssh"
@@ -95,19 +96,17 @@ func (b *Builder) Run(ctx context.Context, ui packer.Ui, hook packer.Hook) (pack
 	)
 
 	if b.config.Communicator == "ssh" {
-		sshSteps, err := b.buildSSHSteps()
-		if err != nil {
-			ui.Errorf("SSH communicator config error: %v", err)
-			return nil, nil
+		sshSteps, errs := b.buildSSHSteps()
+		if len(errs) > 0 {
+			return nil, fmt.Errorf("SSH communicator config error: %w", errors.Join(errs...))
 		}
 		steps = append(steps, sshSteps...)
 	}
 
 	if b.config.Communicator == "winrm" {
-		winRMSteps, err := b.buildWinRMSteps()
-		if err != nil {
-			ui.Errorf("WinRM communicator config error: %v", err)
-			return nil, nil
+		winRMSteps, errs := b.buildWinRMSteps()
+		if len(errs) > 0 {
+			return nil, fmt.Errorf("WinRM communicator config error: %w", errors.Join(errs...))
 		}
 		steps = append(steps, winRMSteps...)
 	}
@@ -134,7 +133,10 @@ func (b *Builder) Run(ctx context.Context, ui packer.Ui, hook packer.Hook) (pack
 		return nil, rawErr.(error)
 	}
 	if _, ok := state.GetOk(multistep.StateCancelled); ok {
-		return nil, nil
+		return nil, errors.New("build was cancelled")
+	}
+	if _, ok := state.GetOk(multistep.StateHalted); ok {
+		return nil, errors.New("build was halted")
 	}
 
 	if b.config.SkipCreateImage {

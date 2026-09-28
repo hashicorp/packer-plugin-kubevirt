@@ -5,6 +5,7 @@ package iso
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -42,34 +43,29 @@ func (s *StepBootCommand) Run(ctx context.Context, state multistep.StateBag) mul
 
 	streamInterface, err := s.client.VirtualMachineInstance(namespace).VNC(name)
 	if err != nil {
-		ui.Error(err.Error())
-		return multistep.ActionHalt
+		return halt(state, fmt.Errorf("failed to open a VNC connection to the VirtualMachineInstance (%s/%s): %w", namespace, name, err))
 	}
 
 	connection, err := vnc.Client(streamInterface.AsConn(), &vnc.ClientConfig{})
 	if err != nil {
-		ui.Error(err.Error())
-		return multistep.ActionHalt
+		return halt(state, fmt.Errorf("failed to establish a VNC session: %w", err))
 	}
 
 	ui.Say("Typing the boot command... Keep only single VNC connection here!")
 
 	command, err := interpolate.Render(bootCommand, &interpolate.Context{})
 	if err != nil {
-		ui.Error(err.Error())
-		return multistep.ActionHalt
+		return halt(state, fmt.Errorf("failed to render the boot command: %w", err))
 	}
 
 	sequence, err := bootcommand.GenerateExpressionSequence(command)
 	if err != nil {
-		ui.Error(err.Error())
-		return multistep.ActionHalt
+		return halt(state, fmt.Errorf("failed to parse the boot command: %w", err))
 	}
 
 	driver := bootcommand.NewVNCDriver(connection, time.Duration(0))
 	if err := sequence.Do(ctx, driver); err != nil {
-		ui.Error(err.Error())
-		return multistep.ActionHalt
+		return halt(state, fmt.Errorf("failed to type the boot command: %w", err))
 	}
 	return multistep.ActionContinue
 }

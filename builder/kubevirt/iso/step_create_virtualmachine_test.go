@@ -155,25 +155,16 @@ var _ = Describe("StepCreateVirtualMachine", func() {
 
 			action := step.Run(context.Background(), state)
 			Expect(action).To(Equal(multistep.ActionHalt))
+			Expect(state.Get("error")).To(MatchError(ContainSubstring("simulated create error")))
 		})
 
 		It("halts when VM never becomes Ready", func() {
-			_, err := vmClient.KubevirtV1().VirtualMachines(namespace).Create(context.Background(),
-				&v1.VirtualMachine{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      name,
-						Namespace: namespace,
-					},
-					Status: v1.VirtualMachineStatus{Ready: false},
-				},
-				metav1.CreateOptions{})
-			Expect(err).NotTo(HaveOccurred())
-
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
 
 			action := step.Run(ctx, state)
 			Expect(action).To(Equal(multistep.ActionHalt))
+			Expect(state.Get("error")).To(MatchError(ContainSubstring("did not become ready")))
 		})
 	})
 

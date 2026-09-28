@@ -5,6 +5,7 @@ package iso
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/hashicorp/packer-plugin-sdk/multistep"
@@ -38,8 +39,7 @@ func (s *StepCreateVirtualMachine) Run(ctx context.Context, state multistep.Stat
 	networks := s.Config.Networks
 
 	if osType == "" || (osType != "linux" && osType != "windows") {
-		ui.Errorf("OS type of '%s' is not supported, set 'linux' or 'windows'.", osType)
-		return multistep.ActionHalt
+		return halt(state, fmt.Errorf("OS type of '%s' is not supported, set 'linux' or 'windows'", osType))
 	}
 
 	virtualMachine := virtualMachine(
@@ -59,12 +59,11 @@ func (s *StepCreateVirtualMachine) Run(ctx context.Context, state multistep.Stat
 
 	_, err := s.Client.VirtualMachine(namespace).Create(ctx, virtualMachine, metav1.CreateOptions{})
 	if err != nil {
-		ui.Error(err.Error())
-		return multistep.ActionHalt
+		return halt(state, fmt.Errorf("failed to create the VirtualMachine (%s/%s): %w", namespace, name, err))
 	}
 
 	if err := s.waitUntilVirtualMachineReady(ctx); err != nil {
-		return multistep.ActionHalt
+		return halt(state, fmt.Errorf("the VirtualMachine (%s/%s) did not become ready: %w", namespace, name, err))
 	}
 	return multistep.ActionContinue
 }

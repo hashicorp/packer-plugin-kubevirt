@@ -23,7 +23,6 @@ import (
 	"kubevirt.io/client-go/kubecli"
 	cdiv1beta1 "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/testing"
 )
@@ -115,19 +114,15 @@ var _ = Describe("StepCreateBootableVolume", func() {
 
 			action := step.Run(context.Background(), state)
 			Expect(action).To(Equal(multistep.ActionHalt))
+			Expect(state.Get("error")).To(MatchError(ContainSubstring("boom: DV create failed")))
 		})
 
 		It("halts when DataVolume does not succeed", func() {
-			_, err := cdiClient.CdiV1beta1().DataVolumes(namespace).Create(context.Background(), &cdiv1beta1.DataVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      name,
-					Namespace: namespace,
-				},
-				Status: cdiv1beta1.DataVolumeStatus{
-					Phase: cdiv1beta1.Pending,
-				},
-			}, metav1.CreateOptions{})
-			Expect(err).NotTo(HaveOccurred())
+			cdiClient.PrependReactor("create", "datavolumes", func(action testing.Action) (bool, runtime.Object, error) {
+				dv := action.(testing.CreateAction).GetObject().(*cdiv1beta1.DataVolume)
+				dv.Status.Phase = cdiv1beta1.Pending
+				return false, dv, nil
+			})
 
 			// Cancel context so wait ends
 			ctx, cancel := context.WithCancel(context.Background())
@@ -135,26 +130,22 @@ var _ = Describe("StepCreateBootableVolume", func() {
 
 			action := step.Run(ctx, state)
 			Expect(action).To(Equal(multistep.ActionHalt))
+			Expect(state.Get("error")).To(MatchError(ContainSubstring("did not succeed")))
 		})
 
 		It("halts when DataSource creation fails", func() {
-			_, err := cdiClient.CdiV1beta1().DataVolumes(namespace).Create(context.Background(), &cdiv1beta1.DataVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      name,
-					Namespace: namespace,
-				},
-				Status: cdiv1beta1.DataVolumeStatus{
-					Phase: cdiv1beta1.Succeeded,
-				},
-			}, metav1.CreateOptions{})
-			Expect(err).NotTo(HaveOccurred())
-
+			cdiClient.PrependReactor("create", "datavolumes", func(action testing.Action) (bool, runtime.Object, error) {
+				dv := action.(testing.CreateAction).GetObject().(*cdiv1beta1.DataVolume)
+				dv.Status.Phase = cdiv1beta1.Succeeded
+				return false, dv, nil
+			})
 			cdiClient.PrependReactor("create", "datasources", func(action testing.Action) (bool, runtime.Object, error) {
 				return true, nil, fmt.Errorf("boom: DS create failed")
 			})
 
 			action := step.Run(context.Background(), state)
 			Expect(action).To(Equal(multistep.ActionHalt))
+			Expect(state.Get("error")).To(MatchError(ContainSubstring("boom: DS create failed")))
 		})
 	})
 })

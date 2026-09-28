@@ -5,6 +5,7 @@ package iso
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/hashicorp/packer-plugin-sdk/multistep"
 	"github.com/hashicorp/packer-plugin-sdk/packer"
@@ -30,15 +31,13 @@ func (s *StepStopVirtualMachine) Run(ctx context.Context, state multistep.StateB
 
 	vm, err := s.Client.VirtualMachine(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
-		ui.Error(err.Error())
-		return multistep.ActionHalt
+		return halt(state, fmt.Errorf("failed to get the VirtualMachine (%s/%s): %w", namespace, name, err))
 	}
 	vm.Spec.RunStrategy = ptr.To(v1.RunStrategyHalted)
 
 	_, err = s.Client.VirtualMachine(vm.Namespace).Update(ctx, vm, metav1.UpdateOptions{})
 	if err != nil {
-		ui.Error(err.Error())
-		return multistep.ActionHalt
+		return halt(state, fmt.Errorf("failed to stop the VirtualMachine (%s/%s): %w", namespace, name, err))
 	}
 	return multistep.ActionContinue
 }
