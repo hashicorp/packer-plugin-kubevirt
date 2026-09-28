@@ -1,5 +1,5 @@
 Type: `kubevirt-iso`
-Artifact BuilderId: `kubevirt.iso`
+Artifact BuilderId: `packer.kubevirt.iso`
 
 The KubeVirt ISO builder creates VM image inside a Kubernetes cluster from
 ISO file. The builder supports Linux and Windows operating systems. Provisioning is done
