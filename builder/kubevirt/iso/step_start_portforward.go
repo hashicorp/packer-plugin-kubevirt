@@ -36,6 +36,7 @@ type StepStartPortForward struct {
 
 type PortForwarder interface {
 	StartForwarding(address *net.IPAddr, port common.ForwardedPort) (net.Addr, error)
+	LastError() error
 	Close() error
 }
 
@@ -117,6 +118,16 @@ func (s *StepStartPortForward) Run(ctx context.Context, state multistep.StateBag
 func (s *StepStartPortForward) Cleanup(state multistep.StateBag) {
 	if s.forwarder == nil {
 		return
+	}
+
+	// The communicator only reports a timeout when it cannot connect, while
+	// the tunnel error explains why, e.g. missing RBAC permissions for the
+	// portforward subresource or a network policy blocking the connection.
+	if _, connected := state.GetOk("communicator"); !connected {
+		if err := s.forwarder.LastError(); err != nil {
+			state.Get("ui").(packer.Ui).Errorf("Last port forwarding error for the VirtualMachine (%s/%s): %s",
+				s.Config.Namespace, s.Config.Name, err)
+		}
 	}
 
 	if err := s.forwarder.Close(); err != nil {

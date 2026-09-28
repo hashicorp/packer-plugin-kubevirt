@@ -45,6 +45,7 @@ type PortForwarder struct {
 
 	mu       sync.Mutex
 	listener net.Listener
+	lastErr  error
 }
 
 type ForwardedPort struct {
@@ -125,6 +126,7 @@ func (p *PortForwarder) WaitForConnection(listener net.Listener, port ForwardedP
 		}
 		log.Log.Infof("opening new tcp tunnel to %d", port.Remote)
 		stream, err := p.Resource.PortForward(p.Name, port.Remote, port.Protocol)
+		p.recordError(err)
 		if err != nil {
 			log.Log.Errorf("can't access %s/%s.%s: %v", p.Kind, p.Name, p.Namespace, err)
 			conn.Close()
@@ -132,6 +134,21 @@ func (p *PortForwarder) WaitForConnection(listener net.Listener, port ForwardedP
 		}
 		go p.HandleConnection(conn, stream.AsConn(), port)
 	}
+}
+
+// LastError returns the error of the most recent tunnel to the resource, or
+// nil if it was opened and closed cleanly. The communicator only sees a closed
+// connection, so this is the only place the actual reason is available.
+func (p *PortForwarder) LastError() error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.lastErr
+}
+
+func (p *PortForwarder) recordError(err error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.lastErr = err
 }
 
 // handleConnection copies data between the local connection and the stream to
@@ -148,14 +165,23 @@ func (p *PortForwarder) HandleConnection(local, remote net.Conn, port ForwardedP
 		errs <- err
 	}()
 
-	HandleConnectionError(<-errs, port)
+	// Only the first error explains why the tunnel ended, the second one is
+	// caused by closing both connections below.
+	if err := <-errs; isConnectionError(err) {
+		HandleConnectionError(err, port)
+		p.recordError(err)
+	}
 	local.Close()
 	remote.Close()
 	HandleConnectionError(<-errs, port)
 }
 
 func HandleConnectionError(err error, port ForwardedPort) {
-	if err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
+	if isConnectionError(err) {
 		log.Log.Errorf("error handling connection for %d: %v", port.Local, err)
 	}
+}
+
+func isConnectionError(err error) bool {
+	return err != nil && !strings.Contains(err.Error(), "use of closed network connection")
 }

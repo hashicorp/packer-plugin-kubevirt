@@ -136,6 +136,35 @@ func TestForwardingKeepsListeningAfterATunnelError(t *testing.T) {
 	}
 }
 
+func TestLastErrorReportsTheMostRecentTunnel(t *testing.T) {
+	resource := newFakeResource()
+	tunnelErr := errors.New("Websocket failed with http status: 403 Forbidden")
+	resource.setErr(tunnelErr)
+	forwarder, addr := startForwarder(t, resource)
+
+	if err := forwarder.LastError(); err != nil {
+		t.Fatalf("expected no error before any tunnel, got %v", err)
+	}
+
+	failed := dial(t, addr)
+	_, _ = failed.Read(make([]byte, 1))
+	if err := forwarder.LastError(); !errors.Is(err, tunnelErr) {
+		t.Fatalf("expected the tunnel error, got %v", err)
+	}
+
+	// A tunnel that opens successfully clears the previous error.
+	resource.setErr(nil)
+	_ = dial(t, addr)
+	_ = receiveVMEnd(t, resource)
+	deadline := time.Now().Add(5 * time.Second)
+	for forwarder.LastError() != nil {
+		if time.Now().After(deadline) {
+			t.Fatalf("expected the error to be cleared, got %v", forwarder.LastError())
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
 func TestCloseStopsAcceptingConnections(t *testing.T) {
 	forwarder, addr := startForwarder(t, newFakeResource())
 

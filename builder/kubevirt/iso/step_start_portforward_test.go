@@ -30,6 +30,7 @@ type mockPortForwarder struct {
 	address *net.IPAddr
 	port    common.ForwardedPort
 	err     error
+	lastErr error
 }
 
 // StartForwarding mimics the real forwarder: a local port of 0 is replaced by
@@ -47,6 +48,10 @@ func (m *mockPortForwarder) StartForwarding(address *net.IPAddr, port common.For
 		local = 40123
 	}
 	return &net.TCPAddr{IP: address.IP, Port: local}, nil
+}
+
+func (m *mockPortForwarder) LastError() error {
+	return m.lastErr
 }
 
 func (m *mockPortForwarder) Close() error {
@@ -195,6 +200,24 @@ var _ = Describe("StepStartPortForward", func() {
 		It("does nothing when forwarding was not started", func() {
 			step.Cleanup(state)
 			Expect(mockFwd.closed).To(BeFalse())
+		})
+
+		It("reports the last tunnel error when the communicator could not connect", func() {
+			Expect(step.Run(context.Background(), state)).To(Equal(multistep.ActionContinue))
+			mockFwd.lastErr = fmt.Errorf("Websocket failed with http status: 403 Forbidden")
+
+			step.Cleanup(state)
+			Expect(uiErr.String()).To(ContainSubstring(
+				"Last port forwarding error for the VirtualMachine (test-ns/test-vm): Websocket failed with http status: 403 Forbidden"))
+		})
+
+		It("does not report tunnel errors once the communicator connected", func() {
+			Expect(step.Run(context.Background(), state)).To(Equal(multistep.ActionContinue))
+			mockFwd.lastErr = fmt.Errorf("stream closed")
+			state.Put("communicator", "connected")
+
+			step.Cleanup(state)
+			Expect(uiErr.String()).To(BeEmpty())
 		})
 	})
 })
