@@ -105,7 +105,9 @@ type Config struct {
 	// KubeConfig is the path to the kubeconfig file used to connect to the cluster.
 	// A leading `~` is expanded to the home directory of the current user.
 	KubeConfig string `mapstructure:"kube_config" required:"true"`
-	// Name is the name of the VM image.
+	// Name is the name of the VM image, used for the resulting DataVolume and DataSource
+	// as well as for the temporary VM. The build stops before creating anything if a
+	// DataVolume, DataSource or PersistentVolumeClaim with this name already exists.
 	Name string `mapstructure:"name" required:"true"`
 	// Namespace is the namespace in which to create the VM image.
 	Namespace string `mapstructure:"namespace" required:"true"`

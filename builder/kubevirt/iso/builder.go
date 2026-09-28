@@ -60,6 +60,12 @@ func (b *Builder) Run(ctx context.Context, ui packer.Ui, hook packer.Hook) (pack
 	generatedData := &packerbuilderdata.GeneratedData{State: state}
 
 	steps := []multistep.Step{}
+	if !b.config.SkipCreateImage {
+		steps = append(steps, &StepPreValidate{
+			Config: b.config,
+			Client: b.client,
+		})
+	}
 	steps = append(steps,
 		&StepValidateIsoDataVolume{
 			Config: b.config,
