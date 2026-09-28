@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/packer-plugin-sdk/packer"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
 
 	v1 "kubevirt.io/api/core/v1"
@@ -29,15 +30,22 @@ func (s *StepStopVirtualMachine) Run(ctx context.Context, state multistep.StateB
 
 	ui.Sayf("Stopping the temporary VirtualMachine (%s/%s)...", namespace, name)
 
-	vm, err := s.Client.VirtualMachine(namespace).Get(ctx, name, metav1.GetOptions{})
-	if err != nil {
-		return halt(state, fmt.Errorf("failed to get the VirtualMachine (%s/%s): %w", namespace, name, err))
-	}
-	vm.Spec.RunStrategy = ptr.To(v1.RunStrategyHalted)
+	// The VM status is updated concurrently by KubeVirt, e.g. while the guest
+	// shuts down after provisioning, so retry when the update conflicts.
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		vm, err := s.Client.VirtualMachine(namespace).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to get the VirtualMachine (%s/%s): %w", namespace, name, err)
+		}
+		vm.Spec.RunStrategy = ptr.To(v1.RunStrategyHalted)
 
-	_, err = s.Client.VirtualMachine(vm.Namespace).Update(ctx, vm, metav1.UpdateOptions{})
+		if _, err := s.Client.VirtualMachine(vm.Namespace).Update(ctx, vm, metav1.UpdateOptions{}); err != nil {
+			return fmt.Errorf("failed to stop the VirtualMachine (%s/%s): %w", namespace, name, err)
+		}
+		return nil
+	})
 	if err != nil {
-		return halt(state, fmt.Errorf("failed to stop the VirtualMachine (%s/%s): %w", namespace, name, err))
+		return halt(state, err)
 	}
 	return multistep.ActionContinue
 }
