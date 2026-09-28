@@ -84,6 +84,9 @@ build {
   If no networks are specified, a single pod network will be used.
 
 - `media_files` ([]string) - MediaFiles is a path list of files to be copied and used during the ISO installation.
+  The files are stored in a ConfigMap and attached to the VM as a disk, where each
+  file is named after its base name. The file names must therefore be unique, and
+  the files must add up to at most 1 MiB.
 
 - `media_label` (string) - MediaLabel is the volume label of the disk that holds the `media_files`.
   Different installers discover their configuration through different labels, e.g.

@@ -63,6 +63,46 @@ var _ = Describe("Config", func() {
 		})
 	})
 
+	Context("Prepare media_files", func() {
+		var dir string
+
+		writeFile := func(path string, size int) string {
+			Expect(os.MkdirAll(filepath.Dir(path), 0o755)).To(Succeed())
+			Expect(os.WriteFile(path, make([]byte, size), 0o644)).To(Succeed())
+			return path
+		}
+
+		BeforeEach(func() {
+			dir = GinkgoT().TempDir()
+		})
+
+		It("accepts existing files", func() {
+			c := &iso.Config{}
+			_, err := c.Prepare(validRawConfig(map[string]interface{}{
+				"media_files": []string{writeFile(filepath.Join(dir, "ks.cfg"), 10), writeFile(filepath.Join(dir, "driver.cat"), 10)},
+			}))
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		DescribeTable("rejects files that cannot be stored in the media ConfigMap",
+			func(files func() []string, expected string) {
+				c := &iso.Config{}
+				_, err := c.Prepare(validRawConfig(map[string]interface{}{"media_files": files()}))
+				Expect(err).To(MatchError(ContainSubstring(expected)))
+			},
+			// The rest of the message comes from the operating system.
+			Entry("missing file", func() []string { return []string{filepath.Join(dir, "missing.cfg")} }, "missing.cfg"),
+			Entry("directory", func() []string { return []string{dir} }, "is not a regular file"),
+			Entry("duplicate file names", func() []string {
+				return []string{writeFile(filepath.Join(dir, "a", "ks.cfg"), 1), writeFile(filepath.Join(dir, "b", "ks.cfg"), 1)}
+			}, "have the same file name"),
+			Entry("invalid file name", func() []string { return []string{writeFile(filepath.Join(dir, "my ks.cfg"), 1)} }, "the file name of"),
+			Entry("more than a ConfigMap can hold", func() []string {
+				return []string{writeFile(filepath.Join(dir, "big.iso"), 1024*1024+1)}
+			}, "a ConfigMap can hold at most 1048576 bytes"),
+		)
+	})
+
 	Context("Prepare kube_config", func() {
 		It("is required", func() {
 			c := &iso.Config{}

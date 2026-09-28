@@ -77,6 +77,22 @@ var _ = Describe("StepCopyMediaFiles", func() {
 			Expect(cm.Data).To(HaveKeyWithValue("file2.iso", "fake iso data 2"))
 		})
 
+		It("stores files that are not UTF-8 as binary data", func() {
+			driver := filepath.Join(GinkgoT().TempDir(), "viostor.cat")
+			content := []byte{0x30, 0x82, 0xff, 0xfe, 0x00}
+			Expect(os.WriteFile(driver, content, 0o644)).To(Succeed())
+			step.Config.MediaFiles = append(step.Config.MediaFiles, driver)
+
+			action := step.Run(context.Background(), state)
+			Expect(action).To(Equal(multistep.ActionContinue))
+
+			cm, err := kubeClient.CoreV1().ConfigMaps(namespace).Get(context.Background(), name, metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(cm.BinaryData).To(HaveKeyWithValue("viostor.cat", content))
+			Expect(cm.Data).NotTo(HaveKey("viostor.cat"))
+			Expect(cm.Data).To(HaveKeyWithValue("file1.iso", "fake iso data 1"))
+		})
+
 		It("halts when ConfigMap creation fails due to invalid media files", func() {
 			// Simulate invalid media file by injecting empty name
 			step.Config.MediaFiles = []string{""}

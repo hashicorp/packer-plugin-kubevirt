@@ -6,6 +6,7 @@ package iso
 import (
 	"os"
 	"path/filepath"
+	"unicode/utf8"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -21,6 +22,7 @@ const immediateBindingAnnotation = "cdi.kubevirt.io/storage.bind.immediate.reque
 
 func configMap(name string, mediaFiles []string) (*corev1.ConfigMap, error) {
 	data := make(map[string]string)
+	binaryData := make(map[string][]byte)
 
 	for _, path := range mediaFiles {
 		content, err := os.ReadFile(path)
@@ -28,15 +30,22 @@ func configMap(name string, mediaFiles []string) (*corev1.ConfigMap, error) {
 			return nil, err
 		}
 
+		// ConfigMap data must be UTF-8, other content (e.g. Windows driver
+		// files) would be corrupted when serialized, so store it as binary data.
 		filename := filepath.Base(path)
-		data[filename] = string(content)
+		if utf8.Valid(content) {
+			data[filename] = string(content)
+		} else {
+			binaryData[filename] = content
+		}
 	}
 
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Data: data,
+		Data:       data,
+		BinaryData: binaryData,
 	}, nil
 }
 

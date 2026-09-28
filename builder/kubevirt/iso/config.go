@@ -9,6 +9,8 @@ package iso
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -136,6 +138,9 @@ type Config struct {
 	// If no networks are specified, a single pod network will be used.
 	Networks []Network `mapstructure:"networks" required:"false"`
 	// MediaFiles is a path list of files to be copied and used during the ISO installation.
+	// The files are stored in a ConfigMap and attached to the VM as a disk, where each
+	// file is named after its base name. The file names must therefore be unique, and
+	// the files must add up to at most 1 MiB.
 	MediaFiles []string `mapstructure:"media_files" required:"false"`
 	// MediaLabel is the volume label of the disk that holds the `media_files`.
 	// Different installers discover their configuration through different labels, e.g.
@@ -282,6 +287,8 @@ func (c *Config) Prepare(raws ...interface{}) ([]string, error) {
 		errs = packersdk.MultiErrorAppend(errs, validateBootCommand(c.BootCommand)...)
 	}
 
+	errs = packersdk.MultiErrorAppend(errs, validateMediaFiles(c.MediaFiles)...)
+
 	// Keep the historical behaviour of this builder, which only connected to
 	// the VM when a communicator was explicitly configured.
 	if c.Comm.Type == "" {
@@ -418,6 +425,45 @@ func validateBootCommand(bootCommand []string) []error {
 	var errs []error
 	for _, err := range sequence.Validate() {
 		errs = append(errs, fmt.Errorf("boot_command is invalid: %w", err))
+	}
+	return errs
+}
+
+// maxMediaSize is the maximum size of the data stored in a ConfigMap.
+const maxMediaSize = 1024 * 1024
+
+// validateMediaFiles checks that the media files can be stored in the
+// ConfigMap backing the media disk, where each file is keyed by its name.
+func validateMediaFiles(paths []string) []error {
+	var errs []error
+	var totalSize int64
+	names := make(map[string]string, len(paths))
+
+	for _, path := range paths {
+		info, err := os.Stat(path)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("media_files: %w", err))
+			continue
+		}
+		if !info.Mode().IsRegular() {
+			errs = append(errs, fmt.Errorf("media_files: %q is not a regular file", path))
+			continue
+		}
+		totalSize += info.Size()
+
+		name := filepath.Base(path)
+		if other, ok := names[name]; ok {
+			errs = append(errs, fmt.Errorf("media_files: %q and %q have the same file name, which must be unique", other, path))
+		}
+		names[name] = path
+
+		for _, msg := range validation.IsConfigMapKey(name) {
+			errs = append(errs, fmt.Errorf("media_files: the file name of %q is invalid: %s", path, msg))
+		}
+	}
+
+	if totalSize > maxMediaSize {
+		errs = append(errs, fmt.Errorf("media_files: the files add up to %d bytes, but a ConfigMap can hold at most %d bytes", totalSize, maxMediaSize))
 	}
 	return errs
 }
