@@ -6,6 +6,7 @@ package iso
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -30,6 +31,13 @@ func (s *StepBootCommand) Run(ctx context.Context, state multistep.StateBag) mul
 	bootCommand := strings.Join(s.config.BootCommand, "")
 	bootWait := s.config.BootWait
 
+	// Only connect to VNC when there is something to type, which also avoids
+	// requiring access to the VNC subresource.
+	if len(s.config.BootCommand) == 0 {
+		log.Println("[INFO] No boot command given, skipping")
+		return multistep.ActionContinue
+	}
+
 	if int64(bootWait) > 0 {
 		ui.Sayf("Waiting %s to boot...", bootWait.String())
 
@@ -50,6 +58,9 @@ func (s *StepBootCommand) Run(ctx context.Context, state multistep.StateBag) mul
 	if err != nil {
 		return halt(state, fmt.Errorf("failed to establish a VNC session: %w", err))
 	}
+	// KubeVirt allows a single VNC session per VM, release it once typing is
+	// done so that it can be used to follow the installation.
+	defer connection.Close()
 
 	ui.Say("Typing the boot command... Keep only single VNC connection here!")
 

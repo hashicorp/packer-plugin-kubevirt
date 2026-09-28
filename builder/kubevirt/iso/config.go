@@ -109,7 +109,8 @@ type Config struct {
 	// Must be at most 32 characters long. Defaults to "OEMDRV".
 	MediaLabel string `mapstructure:"media_label" required:"false"`
 	// BootCommand is a list of strings that represent the keystrokes to be sent to the VM console
-	// to automate the installation via a new VNC connection.
+	// to automate the installation via a new VNC connection. The connection is closed once the
+	// keystrokes are sent. When no boot command is set, the builder does not connect to VNC.
 	BootCommand []string `mapstructure:"boot_command" required:"false"`
 	// BootWait is the amount of time to wait before sending the boot command.
 	// This is useful if the VM takes some time to boot and be ready to accept keystrokes.
