@@ -30,6 +30,10 @@ source "kubevirt-iso" "windows" {
   preference    = "windows.11.virtio"
   os_type       = "windows"
 
+  # Container disk with the VirtIO drivers, e.g. from a registry mirror
+  # in disconnected clusters. Defaults to the upstream KubeVirt image.
+  # virtio_container_image = "registry.example.com/kubevirt/virtio-container-disk:v1.5.2"
+
   # Files to include in the ISO installation
   media_files = [
     #

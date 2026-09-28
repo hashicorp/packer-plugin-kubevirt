@@ -76,6 +76,9 @@ const (
 	// DefaultMediaLabel is the volume label that Anaconda (kickstart) auto-discovers.
 	DefaultMediaLabel   = "OEMDRV"
 	maxMediaLabelLength = 32
+
+	// DefaultVirtIOContainerImage provides the VirtIO drivers to Windows installations.
+	DefaultVirtIOContainerImage = "quay.io/kubevirt/virtio-container-disk:v1.5.2"
 )
 
 // The communicator reaches the VM through a port forward opened with the
@@ -140,6 +143,12 @@ type Config struct {
 	// NoCloud / Subiquity autoinstall (Ubuntu). Only applies when `os_type` is "linux".
 	// Must be at most 32 characters long. Defaults to "OEMDRV".
 	MediaLabel string `mapstructure:"media_label" required:"false"`
+	// VirtIOContainerImage is the container disk image with the VirtIO drivers,
+	// attached as a CD-ROM to Windows VMs so that the installer can use VirtIO
+	// devices. Set it to use a registry mirror in disconnected clusters, or the
+	// drivers image of your distribution. Only applies when `os_type` is "windows".
+	// Defaults to "quay.io/kubevirt/virtio-container-disk:v1.5.2".
+	VirtIOContainerImage string `mapstructure:"virtio_container_image" required:"false"`
 	// BootCommand is a list of strings that represent the keystrokes to be sent to the VM console
 	// to automate the installation via a new VNC connection. The connection is closed once the
 	// keystrokes are sent. When no boot command is set, the builder does not connect to VNC.
@@ -258,6 +267,10 @@ func (c *Config) Prepare(raws ...interface{}) ([]string, error) {
 
 	if c.MediaLabel == "" {
 		c.MediaLabel = DefaultMediaLabel
+	}
+
+	if c.VirtIOContainerImage == "" {
+		c.VirtIOContainerImage = DefaultVirtIOContainerImage
 	}
 
 	// The media disk is an ISO 9660 image, whose volume identifier is limited to 32 characters.

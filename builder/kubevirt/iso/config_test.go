@@ -93,6 +93,7 @@ var _ = Describe("Config", func() {
 			Expect(c.InstanceTypeKind).To(Equal("virtualmachineclusterinstancetype"))
 			Expect(c.PreferenceKind).To(Equal("virtualmachineclusterpreference"))
 			Expect(c.Comm.Type).To(Equal("none"))
+			Expect(c.VirtIOContainerImage).To(Equal(iso.DefaultVirtIOContainerImage))
 		})
 
 		It("accepts network names that KubeVirt accepts", func() {

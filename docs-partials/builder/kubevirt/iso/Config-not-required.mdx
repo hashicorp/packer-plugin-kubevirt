@@ -28,6 +28,12 @@
   NoCloud / Subiquity autoinstall (Ubuntu). Only applies when `os_type` is "linux".
   Must be at most 32 characters long. Defaults to "OEMDRV".
 
+- `virtio_container_image` (string) - VirtIOContainerImage is the container disk image with the VirtIO drivers,
+  attached as a CD-ROM to Windows VMs so that the installer can use VirtIO
+  devices. Set it to use a registry mirror in disconnected clusters, or the
+  drivers image of your distribution. Only applies when `os_type` is "windows".
+  Defaults to "quay.io/kubevirt/virtio-container-disk:v1.5.2".
+
 - `boot_command` ([]string) - BootCommand is a list of strings that represent the keystrokes to be sent to the VM console
   to automate the installation via a new VNC connection. The connection is closed once the
   keystrokes are sent. When no boot command is set, the builder does not connect to VNC.

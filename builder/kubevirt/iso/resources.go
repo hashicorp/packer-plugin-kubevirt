@@ -50,7 +50,8 @@ func virtualMachine(
 	preferenceKind,
 	osType,
 	diskBus,
-	mediaLabel string,
+	mediaLabel,
+	virtioContainerImage string,
 	networks []Network) *v1.VirtualMachine {
 	var disks []v1.Disk
 	var volumes []v1.Volume
@@ -73,7 +74,7 @@ func virtualMachine(
 
 	if osType == "windows" {
 		disks = getWindowsVirtualMachineDisks()
-		volumes = getWindowsVirtualMachineVolumes(name, isoVolumeName)
+		volumes = getWindowsVirtualMachineVolumes(name, isoVolumeName, virtioContainerImage)
 	}
 
 	for i, n := range networks {
@@ -301,7 +302,11 @@ func getWindowsVirtualMachineDisks() []v1.Disk {
 	}
 }
 
-func getWindowsVirtualMachineVolumes(name, isoVolumeName string) []v1.Volume {
+func getWindowsVirtualMachineVolumes(name, isoVolumeName, virtioContainerImage string) []v1.Volume {
+	if virtioContainerImage == "" {
+		virtioContainerImage = DefaultVirtIOContainerImage
+	}
+
 	return []v1.Volume{
 		{
 			Name: "cdrom",
@@ -333,7 +338,7 @@ func getWindowsVirtualMachineVolumes(name, isoVolumeName string) []v1.Volume {
 			Name: "virtiocontainerdisk",
 			VolumeSource: v1.VolumeSource{
 				ContainerDisk: &v1.ContainerDiskSource{
-					Image: "quay.io/kubevirt/virtio-container-disk:v1.5.2",
+					Image: virtioContainerImage,
 				},
 			},
 		},
