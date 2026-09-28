@@ -106,6 +106,15 @@ var _ = Describe("Config", func() {
 					"multus": map[string]interface{}{"networkName": "net1"},
 				}},
 			}, "only one of pod or multus can be defined"),
+			Entry("network without a name", map[string]interface{}{
+				"networks": []map[string]interface{}{{"pod": map[string]interface{}{}}},
+			}, "networks[0]: name must be specified"),
+			Entry("networks with duplicate names", map[string]interface{}{
+				"networks": []map[string]interface{}{
+					{"name": "default", "pod": map[string]interface{}{}},
+					{"name": "default", "multus": map[string]interface{}{"networkName": "net1"}},
+				},
+			}, "network \"default\": names must be unique"),
 		)
 	})
 })

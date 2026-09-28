@@ -359,6 +359,11 @@ func convertToNetwork(n Network) (v1.Network, v1.Interface) {
 			Default:     n.Multus.Default,
 		}
 		vmInterface.InterfaceBindingMethod.Bridge = &v1.InterfaceBridge{}
+	default:
+		// No source specified: fall back to the pod network, as documented
+		// for NetworkSource. KubeVirt rejects networks without a type.
+		vmNetwork.NetworkSource.Pod = &v1.PodNetwork{}
+		vmInterface.InterfaceBindingMethod.Masquerade = &v1.InterfaceMasquerade{}
 	}
 	return vmNetwork, vmInterface
 }

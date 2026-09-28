@@ -252,7 +252,15 @@ func (c *Config) Prepare(raws ...interface{}) ([]string, error) {
 		errs = packersdk.MultiErrorAppend(errs, validateBootCommand(c.BootCommand)...)
 	}
 
-	for _, n := range c.Networks {
+	networkNames := make(map[string]bool, len(c.Networks))
+	for i, n := range c.Networks {
+		if n.Name == "" {
+			errs = packersdk.MultiErrorAppend(errs, fmt.Errorf("networks[%d]: name must be specified", i))
+		} else if networkNames[n.Name] {
+			errs = packersdk.MultiErrorAppend(errs, fmt.Errorf("network %q: names must be unique", n.Name))
+		}
+		networkNames[n.Name] = true
+
 		if n.Pod != nil && n.Multus != nil {
 			errs = packersdk.MultiErrorAppend(errs, fmt.Errorf("network %q: only one of pod or multus can be defined", n.Name))
 		}
