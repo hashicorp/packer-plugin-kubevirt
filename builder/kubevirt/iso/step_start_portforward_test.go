@@ -106,6 +106,7 @@ var _ = Describe("StepStartPortForward", func() {
 			mockFwd.err = fmt.Errorf("simulated forward error")
 			action := step.Run(context.Background(), state)
 			Expect(action).To(Equal(multistep.ActionHalt))
+			Expect(state.Get("error")).To(MatchError(ContainSubstring("simulated forward error")))
 		})
 
 		It("halts when context is cancelled", func() {

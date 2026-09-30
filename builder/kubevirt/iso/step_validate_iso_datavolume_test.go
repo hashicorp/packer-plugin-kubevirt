@@ -85,6 +85,7 @@ var _ = Describe("StepValidateIsoDataVolume", func() {
 		It("halts when DataVolume not found", func() {
 			action := step.Run(context.Background(), state)
 			Expect(action).To(Equal(multistep.ActionHalt))
+			Expect(state.Get("error")).To(MatchError(ContainSubstring("failed to get the ISO DataVolume")))
 		})
 
 		It("halts when DataVolume never succeeds", func() {
@@ -103,6 +104,7 @@ var _ = Describe("StepValidateIsoDataVolume", func() {
 
 			action := step.Run(ctx, state)
 			Expect(action).To(Equal(multistep.ActionHalt))
+			Expect(state.Get("error")).To(MatchError(ContainSubstring("is not ready")))
 		})
 	})
 })

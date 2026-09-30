@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/packer-plugin-sdk/multistep"
 	"github.com/hashicorp/packer-plugin-sdk/packer"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	fakek8sclient "k8s.io/client-go/kubernetes/fake"
@@ -155,35 +156,71 @@ var _ = Describe("StepCreateVirtualMachine", func() {
 
 			action := step.Run(context.Background(), state)
 			Expect(action).To(Equal(multistep.ActionHalt))
+			Expect(state.Get("error")).To(MatchError(ContainSubstring("simulated create error")))
 		})
 
 		It("halts when VM never becomes Ready", func() {
-			_, err := vmClient.KubevirtV1().VirtualMachines(namespace).Create(context.Background(),
-				&v1.VirtualMachine{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      name,
-						Namespace: namespace,
-					},
-					Status: v1.VirtualMachineStatus{Ready: false},
-				},
-				metav1.CreateOptions{})
-			Expect(err).NotTo(HaveOccurred())
-
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
 
 			action := step.Run(ctx, state)
 			Expect(action).To(Equal(multistep.ActionHalt))
+			Expect(state.Get("error")).To(MatchError(ContainSubstring("did not become ready")))
 		})
 	})
 
 	Context("Cleanup", func() {
+		markReadyOnCreate := func() {
+			vmClient.Fake.PrependReactor("create", "virtualmachines", func(action k8stesting.Action) (bool, runtime.Object, error) {
+				obj := action.(k8stesting.CreateAction).GetObject().(*v1.VirtualMachine)
+				obj.Status.Ready = true
+				return false, obj, nil
+			})
+		}
+
 		It("keeps VM when KeepVM is true", func() {
+			markReadyOnCreate()
+			Expect(step.Run(context.Background(), state)).To(Equal(multistep.ActionContinue))
+
 			step.Config.KeepVM = true
-			step.Cleanup(state) // should not panic
+			step.Cleanup(state)
+
+			_, err := vmClient.KubevirtV1().VirtualMachines(namespace).Get(context.Background(), name, metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("deletes VM when KeepVM is false", func() {
+			markReadyOnCreate()
+			Expect(step.Run(context.Background(), state)).To(Equal(multistep.ActionContinue))
+
+			step.Cleanup(state)
+
+			_, err := vmClient.KubevirtV1().VirtualMachines(namespace).Get(context.Background(), name, metav1.GetOptions{})
+			Expect(errors.IsNotFound(err)).To(BeTrue())
+		})
+
+		It("only deletes the VM instance it created", func() {
+			vmClient.Fake.PrependReactor("create", "virtualmachines", func(action k8stesting.Action) (bool, runtime.Object, error) {
+				obj := action.(k8stesting.CreateAction).GetObject().(*v1.VirtualMachine)
+				obj.UID = "created-uid"
+				obj.Status.Ready = true
+				return false, obj, nil
+			})
+			var deleteOptions metav1.DeleteOptions
+			vmClient.Fake.PrependReactor("delete", "virtualmachines", func(action k8stesting.Action) (bool, runtime.Object, error) {
+				deleteOptions = action.(k8stesting.DeleteAction).GetDeleteOptions()
+				return false, nil, nil
+			})
+
+			Expect(step.Run(context.Background(), state)).To(Equal(multistep.ActionContinue))
+			step.Cleanup(state)
+
+			Expect(deleteOptions.Preconditions).NotTo(BeNil())
+			Expect(deleteOptions.Preconditions.UID).To(HaveValue(BeEquivalentTo("created-uid")))
+			Expect(deleteOptions.GracePeriodSeconds).To(HaveValue(BeZero()))
+		})
+
+		It("does not delete a pre-existing VM with the same name", func() {
 			_, err := vmClient.KubevirtV1().VirtualMachines(namespace).Create(context.Background(),
 				&v1.VirtualMachine{
 					ObjectMeta: metav1.ObjectMeta{
@@ -194,10 +231,14 @@ var _ = Describe("StepCreateVirtualMachine", func() {
 				metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
+			action := step.Run(context.Background(), state)
+			Expect(action).To(Equal(multistep.ActionHalt))
+			Expect(state.Get("error")).To(MatchError(ContainSubstring("already exists")))
+
 			step.Cleanup(state)
 
 			_, err = vmClient.KubevirtV1().VirtualMachines(namespace).Get(context.Background(), name, metav1.GetOptions{})
-			Expect(err).To(HaveOccurred()) // deleted
+			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 })

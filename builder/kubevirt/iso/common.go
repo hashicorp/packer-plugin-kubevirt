@@ -7,12 +7,34 @@ import (
 	"context"
 	"time"
 
+	"github.com/hashicorp/packer-plugin-sdk/multistep"
+	"github.com/hashicorp/packer-plugin-sdk/packer"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"kubevirt.io/client-go/kubecli"
 	"kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 )
+
+// halt reports err to the user and records it in the state bag, so that
+// Builder.Run returns it to Packer instead of reporting a successful build.
+func halt(state multistep.StateBag, err error) multistep.StepAction {
+	state.Put("error", err)
+	state.Get("ui").(packer.Ui).Error(err.Error())
+	return multistep.ActionHalt
+}
+
+// deleteOnlyUID returns delete options that only match the object with the
+// given UID, so that cleanup cannot remove an object that replaced the one
+// the build created under the same name.
+func deleteOnlyUID(uid types.UID) metav1.DeleteOptions {
+	if uid == "" {
+		return metav1.DeleteOptions{}
+	}
+	return metav1.DeleteOptions{Preconditions: metav1.NewUIDPreconditions(string(uid))}
+}
 
 func WaitUntilDataVolumeSucceeded(ctx context.Context, client kubecli.KubevirtClient, namespace, name string) error {
 	pollInterval := 15 * time.Second

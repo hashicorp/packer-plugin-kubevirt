@@ -7,6 +7,7 @@ import (
 	"context"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -49,11 +50,17 @@ var _ = Describe("StepCopyMediaFiles", func() {
 
 		kubeClient = fakek8sclient.NewSimpleClientset()
 
+		mediaDir := GinkgoT().TempDir()
+		file1 := filepath.Join(mediaDir, "file1.iso")
+		file2 := filepath.Join(mediaDir, "file2.iso")
+		Expect(os.WriteFile(file1, []byte("fake iso data 1"), 0o644)).To(Succeed())
+		Expect(os.WriteFile(file2, []byte("fake iso data 2"), 0o644)).To(Succeed())
+
 		step = &iso.StepCopyMediaFiles{
 			Config: iso.Config{
 				Name:       name,
 				Namespace:  namespace,
-				MediaFiles: []string{"file1.iso", "file2.iso"},
+				MediaFiles: []string{file1, file2},
 			},
 			Client: kubeClient,
 		}
@@ -61,22 +68,13 @@ var _ = Describe("StepCopyMediaFiles", func() {
 
 	Context("Run", func() {
 		It("continues when ConfigMap is created successfully", func() {
-			// Create dummy files so configMap() can read them
-			err := os.WriteFile("file1.iso", []byte("fake iso data 1"), 0644)
-			Expect(err).NotTo(HaveOccurred())
-			err = os.WriteFile("file2.iso", []byte("fake iso data 2"), 0644)
-			Expect(err).NotTo(HaveOccurred())
-
-			defer os.Remove("file1.iso")
-			defer os.Remove("file2.iso")
-
 			action := step.Run(context.Background(), state)
 			Expect(action).To(Equal(multistep.ActionContinue))
 
 			cm, err := kubeClient.CoreV1().ConfigMaps(namespace).Get(context.Background(), name, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
-			Expect(cm.Data).To(HaveKey("file1.iso"))
-			Expect(cm.Data).To(HaveKey("file2.iso"))
+			Expect(cm.Data).To(HaveKeyWithValue("file1.iso", "fake iso data 1"))
+			Expect(cm.Data).To(HaveKeyWithValue("file2.iso", "fake iso data 2"))
 		})
 
 		It("halts when ConfigMap creation fails due to invalid media files", func() {
@@ -85,6 +83,7 @@ var _ = Describe("StepCopyMediaFiles", func() {
 
 			action := step.Run(context.Background(), state)
 			Expect(action).To(Equal(multistep.ActionHalt))
+			Expect(state.Get("error")).To(MatchError(ContainSubstring("failed to read the media files")))
 		})
 
 		It("halts when ConfigMap creation fails due to API error", func() {
@@ -96,26 +95,59 @@ var _ = Describe("StepCopyMediaFiles", func() {
 
 			action := step.Run(context.Background(), state)
 			Expect(action).To(Equal(multistep.ActionHalt))
+			Expect(state.Get("error")).To(MatchError(ContainSubstring("failed to create the ConfigMap")))
 		})
 	})
 
 	Context("Cleanup", func() {
-		It("deletes ConfigMap successfully", func() {
-			// Pre-create ConfigMap
+		It("deletes the ConfigMap it created", func() {
+			action := step.Run(context.Background(), state)
+			Expect(action).To(Equal(multistep.ActionContinue))
+
+			step.Cleanup(state)
+
+			_, err := kubeClient.CoreV1().ConfigMaps(namespace).Get(context.Background(), name, metav1.GetOptions{})
+			Expect(errors.IsNotFound(err)).To(BeTrue())
+		})
+
+		It("only deletes the ConfigMap instance it created", func() {
+			kubeClient.PrependReactor("create", "configmaps", func(action testing.Action) (bool, runtime.Object, error) {
+				cm := action.(testing.CreateAction).GetObject().(*corev1.ConfigMap)
+				cm.UID = "created-uid"
+				return false, cm, nil
+			})
+			var deleteOptions metav1.DeleteOptions
+			kubeClient.PrependReactor("delete", "configmaps", func(action testing.Action) (bool, runtime.Object, error) {
+				deleteOptions = action.(testing.DeleteAction).GetDeleteOptions()
+				return false, nil, nil
+			})
+
+			Expect(step.Run(context.Background(), state)).To(Equal(multistep.ActionContinue))
+			step.Cleanup(state)
+
+			Expect(deleteOptions.Preconditions).NotTo(BeNil())
+			Expect(deleteOptions.Preconditions.UID).To(HaveValue(BeEquivalentTo("created-uid")))
+		})
+
+		It("does not delete a pre-existing ConfigMap with the same name", func() {
 			_, err := kubeClient.CoreV1().ConfigMaps(namespace).Create(context.Background(), &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Data: map[string]string{"file1.iso": "data"},
+				Data: map[string]string{"user-data": "unrelated"},
 			}, metav1.CreateOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
-			// Cleanup
+			action := step.Run(context.Background(), state)
+			Expect(action).To(Equal(multistep.ActionHalt))
+			Expect(state.Get("error")).To(MatchError(ContainSubstring("already exists")))
+
 			step.Cleanup(state)
 
-			_, err = kubeClient.CoreV1().ConfigMaps(namespace).Get(context.Background(), name, metav1.GetOptions{})
-			Expect(err).To(HaveOccurred()) // Should be deleted
+			cm, err := kubeClient.CoreV1().ConfigMaps(namespace).Get(context.Background(), name, metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(cm.Data).To(HaveKeyWithValue("user-data", "unrelated"))
 		})
 	})
 })

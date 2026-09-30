@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/packer-plugin-sdk/multistep"
 	"github.com/hashicorp/packer-plugin-sdk/packer"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	k8stesting "k8s.io/client-go/testing"
@@ -94,9 +95,39 @@ var _ = Describe("StepStopVirtualMachine", func() {
 			Expect(action).To(Equal(multistep.ActionContinue))
 		})
 
+		It("retries when the update conflicts with a concurrent change", func() {
+			_, err := vmClient.KubevirtV1().VirtualMachines(namespace).Create(context.Background(),
+				&v1.VirtualMachine{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      name,
+						Namespace: namespace,
+					},
+				},
+				metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			conflicts := 0
+			vmClient.Fake.PrependReactor("update", "virtualmachines", func(action k8stesting.Action) (bool, runtime.Object, error) {
+				if conflicts < 2 {
+					conflicts++
+					return true, nil, apierrors.NewConflict(v1.Resource("virtualmachines"), name, fmt.Errorf("the object has been modified"))
+				}
+				return false, nil, nil
+			})
+
+			action := step.Run(context.Background(), state)
+			Expect(action).To(Equal(multistep.ActionContinue))
+			Expect(conflicts).To(Equal(2))
+
+			vm, err := vmClient.KubevirtV1().VirtualMachines(namespace).Get(context.Background(), name, metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(vm.Spec.RunStrategy).To(HaveValue(Equal(v1.RunStrategyHalted)))
+		})
+
 		It("halts when VM cannot be retrieved", func() {
 			action := step.Run(context.Background(), state)
 			Expect(action).To(Equal(multistep.ActionHalt))
+			Expect(state.Get("error")).To(MatchError(ContainSubstring("failed to get the VirtualMachine")))
 		})
 
 		It("halts when VM update fails", func() {
@@ -117,6 +148,7 @@ var _ = Describe("StepStopVirtualMachine", func() {
 
 			action := step.Run(context.Background(), state)
 			Expect(action).To(Equal(multistep.ActionHalt))
+			Expect(state.Get("error")).To(MatchError(ContainSubstring("simulated update error")))
 		})
 	})
 })

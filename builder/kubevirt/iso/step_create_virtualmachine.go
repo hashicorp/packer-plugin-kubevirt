@@ -5,12 +5,14 @@ package iso
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/hashicorp/packer-plugin-sdk/multistep"
 	"github.com/hashicorp/packer-plugin-sdk/packer"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	ptr "k8s.io/utils/ptr"
 
@@ -20,6 +22,9 @@ import (
 type StepCreateVirtualMachine struct {
 	Config Config
 	Client kubecli.KubevirtClient
+
+	created bool
+	uid     types.UID
 }
 
 func (s *StepCreateVirtualMachine) Run(ctx context.Context, state multistep.StateBag) multistep.StepAction {
@@ -38,8 +43,7 @@ func (s *StepCreateVirtualMachine) Run(ctx context.Context, state multistep.Stat
 	networks := s.Config.Networks
 
 	if osType == "" || (osType != "linux" && osType != "windows") {
-		ui.Errorf("OS type of '%s' is not supported, set 'linux' or 'windows'.", osType)
-		return multistep.ActionHalt
+		return halt(state, fmt.Errorf("OS type of '%s' is not supported, set 'linux' or 'windows'", osType))
 	}
 
 	virtualMachine := virtualMachine(
@@ -57,19 +61,26 @@ func (s *StepCreateVirtualMachine) Run(ctx context.Context, state multistep.Stat
 
 	ui.Sayf("Creating a new temporary VirtualMachine (%s/%s)...", namespace, name)
 
-	_, err := s.Client.VirtualMachine(namespace).Create(ctx, virtualMachine, metav1.CreateOptions{})
+	vm, err := s.Client.VirtualMachine(namespace).Create(ctx, virtualMachine, metav1.CreateOptions{})
 	if err != nil {
-		ui.Error(err.Error())
-		return multistep.ActionHalt
+		return halt(state, fmt.Errorf("failed to create the VirtualMachine (%s/%s): %w", namespace, name, err))
 	}
+	s.created = true
+	s.uid = vm.UID
 
 	if err := s.waitUntilVirtualMachineReady(ctx); err != nil {
-		return multistep.ActionHalt
+		return halt(state, fmt.Errorf("the VirtualMachine (%s/%s) did not become ready: %w", namespace, name, err))
 	}
 	return multistep.ActionContinue
 }
 
 func (s *StepCreateVirtualMachine) Cleanup(state multistep.StateBag) {
+	// Never delete a VirtualMachine that this build did not create, e.g. one
+	// that already existed with the same name and made the creation fail.
+	if !s.created {
+		return
+	}
+
 	ui := state.Get("ui").(packer.Ui)
 	name := s.Config.Name
 	namespace := s.Config.Namespace
@@ -82,9 +93,9 @@ func (s *StepCreateVirtualMachine) Cleanup(state multistep.StateBag) {
 
 	ui.Sayf("Deleting VirtualMachine (%s/%s)...", namespace, name)
 
-	_ = s.Client.VirtualMachine(namespace).Delete(context.Background(), name, metav1.DeleteOptions{
-		GracePeriodSeconds: ptr.To(int64(0)),
-	})
+	deleteOptions := deleteOnlyUID(s.uid)
+	deleteOptions.GracePeriodSeconds = ptr.To(int64(0))
+	_ = s.Client.VirtualMachine(namespace).Delete(context.Background(), name, deleteOptions)
 }
 
 func (s *StepCreateVirtualMachine) waitUntilVirtualMachineReady(ctx context.Context) error {

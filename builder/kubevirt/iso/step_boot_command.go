@@ -5,6 +5,8 @@ package iso
 
 import (
 	"context"
+	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -29,6 +31,13 @@ func (s *StepBootCommand) Run(ctx context.Context, state multistep.StateBag) mul
 	bootCommand := strings.Join(s.config.BootCommand, "")
 	bootWait := s.config.BootWait
 
+	// Only connect to VNC when there is something to type, which also avoids
+	// requiring access to the VNC subresource.
+	if len(s.config.BootCommand) == 0 {
+		log.Println("[INFO] No boot command given, skipping")
+		return multistep.ActionContinue
+	}
+
 	if int64(bootWait) > 0 {
 		ui.Sayf("Waiting %s to boot...", bootWait.String())
 
@@ -42,34 +51,32 @@ func (s *StepBootCommand) Run(ctx context.Context, state multistep.StateBag) mul
 
 	streamInterface, err := s.client.VirtualMachineInstance(namespace).VNC(name)
 	if err != nil {
-		ui.Error(err.Error())
-		return multistep.ActionHalt
+		return halt(state, fmt.Errorf("failed to open a VNC connection to the VirtualMachineInstance (%s/%s): %w", namespace, name, err))
 	}
 
 	connection, err := vnc.Client(streamInterface.AsConn(), &vnc.ClientConfig{})
 	if err != nil {
-		ui.Error(err.Error())
-		return multistep.ActionHalt
+		return halt(state, fmt.Errorf("failed to establish a VNC session: %w", err))
 	}
+	// KubeVirt allows a single VNC session per VM, release it once typing is
+	// done so that it can be used to follow the installation.
+	defer connection.Close()
 
 	ui.Say("Typing the boot command... Keep only single VNC connection here!")
 
 	command, err := interpolate.Render(bootCommand, &interpolate.Context{})
 	if err != nil {
-		ui.Error(err.Error())
-		return multistep.ActionHalt
+		return halt(state, fmt.Errorf("failed to render the boot command: %w", err))
 	}
 
 	sequence, err := bootcommand.GenerateExpressionSequence(command)
 	if err != nil {
-		ui.Error(err.Error())
-		return multistep.ActionHalt
+		return halt(state, fmt.Errorf("failed to parse the boot command: %w", err))
 	}
 
 	driver := bootcommand.NewVNCDriver(connection, time.Duration(0))
 	if err := sequence.Do(ctx, driver); err != nil {
-		ui.Error(err.Error())
-		return multistep.ActionHalt
+		return halt(state, fmt.Errorf("failed to type the boot command: %w", err))
 	}
 	return multistep.ActionContinue
 }
