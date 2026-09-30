@@ -181,6 +181,37 @@ func TestCloseStopsAcceptingConnections(t *testing.T) {
 	}
 }
 
+func TestCloseClosesOpenTunnels(t *testing.T) {
+	resource := newFakeResource()
+	forwarder, addr := startForwarder(t, resource)
+
+	client := dial(t, addr)
+	vm := receiveVMEnd(t, resource)
+	if _, err := client.Write([]byte("x")); err != nil {
+		t.Fatalf("write to tunnel: %v", err)
+	}
+	if _, err := io.ReadFull(vm, make([]byte, 1)); err != nil {
+		t.Fatalf("expected the VM to receive data: %v", err)
+	}
+
+	if err := forwarder.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	// Both ends of the tunnel are closed, so reads return instead of blocking
+	// until the deadline set by dial and receiveVMEnd.
+	start := time.Now()
+	if _, err := client.Read(make([]byte, 1)); err == nil {
+		t.Fatal("expected the client connection to be closed")
+	}
+	if _, err := vm.Read(make([]byte, 1)); err == nil {
+		t.Fatal("expected the connection to the VM to be closed")
+	}
+	if elapsed := time.Since(start); elapsed > 2*time.Second {
+		t.Fatalf("the tunnel was not closed by Close, reads returned after %s", elapsed)
+	}
+}
+
 func TestCloseBeforeStartIsANoop(t *testing.T) {
 	forwarder := &PortForwarder{}
 	if err := forwarder.Close(); err != nil {

@@ -45,6 +45,8 @@ type PortForwarder struct {
 
 	mu       sync.Mutex
 	listener net.Listener
+	conns    map[net.Conn]struct{}
+	closed   bool
 	lastErr  error
 }
 
@@ -91,21 +93,52 @@ func (p *PortForwarder) StartForwardingTCP(address *net.IPAddr, port ForwardedPo
 	return listener.Addr(), nil
 }
 
-// Close stops accepting new connections. Tunnels that are already open are
-// left to finish on their own.
+// Close stops accepting new connections and closes the open tunnels, such as
+// the persistent connection of the SSH communicator. The forwarder cannot be
+// reused afterwards.
 func (p *PortForwarder) Close() error {
+	p.mu.Lock()
+	listener, conns := p.listener, p.conns
+	p.listener, p.conns, p.closed = nil, nil, true
+	p.mu.Unlock()
+
+	var err error
+	if listener != nil {
+		if err = listener.Close(); errors.Is(err, net.ErrClosed) {
+			err = nil
+		}
+	}
+	for conn := range conns {
+		conn.Close()
+	}
+	return err
+}
+
+// track registers the connections of a tunnel so that Close can close them.
+// It returns false if the forwarder is already closed.
+func (p *PortForwarder) track(conns ...net.Conn) bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	if p.listener == nil {
-		return nil
+	if p.closed {
+		return false
 	}
-	err := p.listener.Close()
-	p.listener = nil
-	if errors.Is(err, net.ErrClosed) {
-		return nil
+	if p.conns == nil {
+		p.conns = make(map[net.Conn]struct{})
 	}
-	return err
+	for _, conn := range conns {
+		p.conns[conn] = struct{}{}
+	}
+	return true
+}
+
+func (p *PortForwarder) untrack(conns ...net.Conn) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	for _, conn := range conns {
+		delete(p.conns, conn)
+	}
 }
 
 func (p *PortForwarder) closeListener(listener net.Listener) {
@@ -154,6 +187,13 @@ func (p *PortForwarder) recordError(err error) {
 // handleConnection copies data between the local connection and the stream to
 // the remote server.
 func (p *PortForwarder) HandleConnection(local, remote net.Conn, port ForwardedPort) {
+	if !p.track(local, remote) {
+		local.Close()
+		remote.Close()
+		return
+	}
+	defer p.untrack(local, remote)
+
 	log.Log.Infof("handling tcp connection for %d", port.Local)
 	errs := make(chan error)
 	go func() {
