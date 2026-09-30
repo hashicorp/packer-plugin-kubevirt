@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/packer-plugin-sdk/packer"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -19,6 +20,7 @@ type StepCopyMediaFiles struct {
 	Client kubernetes.Interface
 
 	created bool
+	uid     types.UID
 }
 
 func (s *StepCopyMediaFiles) Run(ctx context.Context, state multistep.StateBag) multistep.StepAction {
@@ -34,11 +36,12 @@ func (s *StepCopyMediaFiles) Run(ctx context.Context, state multistep.StateBag) 
 		return halt(state, fmt.Errorf("failed to read the media files: %w", err))
 	}
 
-	_, err = s.Client.CoreV1().ConfigMaps(namespace).Create(ctx, configMap, metav1.CreateOptions{})
+	cm, err := s.Client.CoreV1().ConfigMaps(namespace).Create(ctx, configMap, metav1.CreateOptions{})
 	if err != nil {
 		return halt(state, fmt.Errorf("failed to create the ConfigMap (%s/%s): %w", namespace, name, err))
 	}
 	s.created = true
+	s.uid = cm.UID
 	return multistep.ActionContinue
 }
 
@@ -55,5 +58,5 @@ func (s *StepCopyMediaFiles) Cleanup(state multistep.StateBag) {
 
 	ui.Sayf("Deleting ConfigMap (%s/%s)...", namespace, name)
 
-	_ = s.Client.CoreV1().ConfigMaps(namespace).Delete(context.Background(), name, metav1.DeleteOptions{})
+	_ = s.Client.CoreV1().ConfigMaps(namespace).Delete(context.Background(), name, deleteOnlyUID(s.uid))
 }

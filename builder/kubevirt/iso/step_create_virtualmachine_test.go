@@ -199,6 +199,27 @@ var _ = Describe("StepCreateVirtualMachine", func() {
 			Expect(errors.IsNotFound(err)).To(BeTrue())
 		})
 
+		It("only deletes the VM instance it created", func() {
+			vmClient.Fake.PrependReactor("create", "virtualmachines", func(action k8stesting.Action) (bool, runtime.Object, error) {
+				obj := action.(k8stesting.CreateAction).GetObject().(*v1.VirtualMachine)
+				obj.UID = "created-uid"
+				obj.Status.Ready = true
+				return false, obj, nil
+			})
+			var deleteOptions metav1.DeleteOptions
+			vmClient.Fake.PrependReactor("delete", "virtualmachines", func(action k8stesting.Action) (bool, runtime.Object, error) {
+				deleteOptions = action.(k8stesting.DeleteAction).GetDeleteOptions()
+				return false, nil, nil
+			})
+
+			Expect(step.Run(context.Background(), state)).To(Equal(multistep.ActionContinue))
+			step.Cleanup(state)
+
+			Expect(deleteOptions.Preconditions).NotTo(BeNil())
+			Expect(deleteOptions.Preconditions.UID).To(HaveValue(BeEquivalentTo("created-uid")))
+			Expect(deleteOptions.GracePeriodSeconds).To(HaveValue(BeZero()))
+		})
+
 		It("does not delete a pre-existing VM with the same name", func() {
 			_, err := vmClient.KubevirtV1().VirtualMachines(namespace).Create(context.Background(),
 				&v1.VirtualMachine{

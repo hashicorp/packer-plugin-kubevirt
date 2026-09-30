@@ -110,6 +110,25 @@ var _ = Describe("StepCopyMediaFiles", func() {
 			Expect(errors.IsNotFound(err)).To(BeTrue())
 		})
 
+		It("only deletes the ConfigMap instance it created", func() {
+			kubeClient.PrependReactor("create", "configmaps", func(action testing.Action) (bool, runtime.Object, error) {
+				cm := action.(testing.CreateAction).GetObject().(*corev1.ConfigMap)
+				cm.UID = "created-uid"
+				return false, cm, nil
+			})
+			var deleteOptions metav1.DeleteOptions
+			kubeClient.PrependReactor("delete", "configmaps", func(action testing.Action) (bool, runtime.Object, error) {
+				deleteOptions = action.(testing.DeleteAction).GetDeleteOptions()
+				return false, nil, nil
+			})
+
+			Expect(step.Run(context.Background(), state)).To(Equal(multistep.ActionContinue))
+			step.Cleanup(state)
+
+			Expect(deleteOptions.Preconditions).NotTo(BeNil())
+			Expect(deleteOptions.Preconditions.UID).To(HaveValue(BeEquivalentTo("created-uid")))
+		})
+
 		It("does not delete a pre-existing ConfigMap with the same name", func() {
 			_, err := kubeClient.CoreV1().ConfigMaps(namespace).Create(context.Background(), &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{

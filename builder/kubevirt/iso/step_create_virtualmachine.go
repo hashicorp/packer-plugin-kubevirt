@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/packer-plugin-sdk/packer"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	ptr "k8s.io/utils/ptr"
 
@@ -23,6 +24,7 @@ type StepCreateVirtualMachine struct {
 	Client kubecli.KubevirtClient
 
 	created bool
+	uid     types.UID
 }
 
 func (s *StepCreateVirtualMachine) Run(ctx context.Context, state multistep.StateBag) multistep.StepAction {
@@ -59,11 +61,12 @@ func (s *StepCreateVirtualMachine) Run(ctx context.Context, state multistep.Stat
 
 	ui.Sayf("Creating a new temporary VirtualMachine (%s/%s)...", namespace, name)
 
-	_, err := s.Client.VirtualMachine(namespace).Create(ctx, virtualMachine, metav1.CreateOptions{})
+	vm, err := s.Client.VirtualMachine(namespace).Create(ctx, virtualMachine, metav1.CreateOptions{})
 	if err != nil {
 		return halt(state, fmt.Errorf("failed to create the VirtualMachine (%s/%s): %w", namespace, name, err))
 	}
 	s.created = true
+	s.uid = vm.UID
 
 	if err := s.waitUntilVirtualMachineReady(ctx); err != nil {
 		return halt(state, fmt.Errorf("the VirtualMachine (%s/%s) did not become ready: %w", namespace, name, err))
@@ -90,9 +93,9 @@ func (s *StepCreateVirtualMachine) Cleanup(state multistep.StateBag) {
 
 	ui.Sayf("Deleting VirtualMachine (%s/%s)...", namespace, name)
 
-	_ = s.Client.VirtualMachine(namespace).Delete(context.Background(), name, metav1.DeleteOptions{
-		GracePeriodSeconds: ptr.To(int64(0)),
-	})
+	deleteOptions := deleteOnlyUID(s.uid)
+	deleteOptions.GracePeriodSeconds = ptr.To(int64(0))
+	_ = s.Client.VirtualMachine(namespace).Delete(context.Background(), name, deleteOptions)
 }
 
 func (s *StepCreateVirtualMachine) waitUntilVirtualMachineReady(ctx context.Context) error {
