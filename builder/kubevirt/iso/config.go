@@ -281,6 +281,17 @@ func (c *Config) Prepare(raws ...interface{}) ([]string, error) {
 		errs = packersdk.MultiErrorAppend(errs, fmt.Errorf("communicator %q is not supported, use \"ssh\", \"winrm\" or \"none\"", c.Comm.Type))
 	}
 
+	// The communicator connects to a port forward listening on this machine,
+	// which a bastion host or a proxy would try to reach on their own loopback.
+	if c.Comm.Type == "ssh" {
+		if c.Comm.SSHBastionHost != "" {
+			errs = packersdk.MultiErrorAppend(errs, errors.New("ssh_bastion_host is not supported: the builder connects to the VM through a port forward on this machine"))
+		}
+		if c.Comm.SSHProxyHost != "" {
+			errs = packersdk.MultiErrorAppend(errs, errors.New("ssh_proxy_host is not supported: the builder connects to the VM through a port forward on this machine"))
+		}
+	}
+
 	// Without a communicator the build stops the VM right after the boot
 	// command, so the installation would be interrupted.
 	switch {

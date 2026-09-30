@@ -196,6 +196,10 @@ The builder only connects to the VM when a `communicator` is set, which
 defaults to `none` for this builder. Set it to `ssh` or `winrm` to run
 provisioners in the VM.
 
+The `ssh_bastion_*` and `ssh_proxy_*` options are not supported: the
+communicator connects to a port forward on the machine running Packer, which a
+bastion host or a proxy cannot reach.
+
 <!-- Code generated from the comments of the PortForwardConfig struct in builder/kubevirt/iso/config.go; DO NOT EDIT MANUALLY -->
 
 The communicator reaches the VM through a port forward opened with the

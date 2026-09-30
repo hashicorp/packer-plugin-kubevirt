@@ -168,6 +168,22 @@ var _ = Describe("Config", func() {
 			Expect(err).To(MatchError(ContainSubstring("An ssh_username must be specified")))
 		})
 
+		DescribeTable("rejects options that cannot reach the port forward",
+			func(option string, value interface{}) {
+				c := &iso.Config{}
+				_, err := c.Prepare(validRawConfig(map[string]interface{}{
+					"communicator":         "ssh",
+					"ssh_username":         "fedora",
+					"ssh_password":         "fedora",
+					"ssh_bastion_password": "bastion",
+					option:                 value,
+				}))
+				Expect(err).To(MatchError(ContainSubstring(option + " is not supported")))
+			},
+			Entry("bastion host", "ssh_bastion_host", "bastion.example.com"),
+			Entry("SOCKS proxy", "ssh_proxy_host", "proxy.example.com"),
+		)
+
 		It("rejects communicators the builder cannot connect with", func() {
 			c := &iso.Config{}
 			_, err := c.Prepare(validRawConfig(map[string]interface{}{"communicator": "docker"}))
