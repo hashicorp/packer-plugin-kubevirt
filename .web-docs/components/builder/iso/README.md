@@ -311,27 +311,6 @@ KubeVirt API, which listens on `ssh_host` or `winrm_host` (defaults to
 - `ssh_handshake_attempts` (int) - The number of handshakes to attempt with SSH once it can connect.
   This defaults to `10`, unless a `ssh_timeout` is set.
 
-- `ssh_bastion_host` (string) - A bastion host to use for the actual SSH connection.
-
-- `ssh_bastion_port` (int) - The port of the bastion host. Defaults to `22`.
-
-- `ssh_bastion_agent_auth` (bool) - If `true`, the local SSH agent will be used to authenticate with the
-  bastion host. Defaults to `false`.
-
-- `ssh_bastion_username` (string) - The username to connect to the bastion host.
-
-- `ssh_bastion_password` (string) - The password to use to authenticate with the bastion host.
-
-- `ssh_bastion_interactive` (bool) - If `true`, the keyboard-interactive used to authenticate with bastion host.
-
-- `ssh_bastion_private_key_file` (string) - Path to a PEM encoded private key file to use to authenticate with the
-  bastion host. The `~` can be used in path and will be expanded to the
-  home directory of current user.
-
-- `ssh_bastion_certificate_file` (string) - Path to user certificate used to authenticate with bastion host.
-  The `~` can be used in path and will be expanded to the
-  home directory of current user.
-
 - `ssh_file_transfer_method` (string) - `scp` or `sftp` - How to transfer files, Secure copy (default) or SSH
   File Transfer Protocol.
   
@@ -339,14 +318,6 @@ KubeVirt API, which listens on `ssh_host` or `winrm_host` (defaults to
   (the default protocol for copying data) returns a a non-zero error code since the MOTW
   cannot be set, which cause any file transfer to fail. As a workaround you can override the transfer protocol
   with SFTP instead `ssh_file_transfer_method = "sftp"`.
-
-- `ssh_proxy_host` (string) - A SOCKS proxy host to use for SSH connection
-
-- `ssh_proxy_port` (int) - A port of the SOCKS proxy. Defaults to `1080`.
-
-- `ssh_proxy_username` (string) - The optional username to authenticate with the proxy server.
-
-- `ssh_proxy_password` (string) - The optional password to use to authenticate with the proxy server.
 
 - `ssh_keep_alive_interval` (duration string | ex: "1h5m2s") - How often to send "keep alive" messages to the server. Set to a negative
   value (`-1s`) to disable. Example value: `10s`. Defaults to `5s`.
