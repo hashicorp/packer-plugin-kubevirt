@@ -61,15 +61,16 @@ var _ = Describe("Builder", func() {
 
 				builder := &iso.Builder{}
 				_, _, err := builder.Prepare(map[string]interface{}{
-					"kube_config":       unreachableKubeConfig(),
-					"name":              "test-vm",
-					"namespace":         "test-ns",
-					"iso_volume_name":   "test-iso",
-					"disk_size":         "10Gi",
-					"instance_type":     "u1.medium",
-					"preference":        "fedora",
-					"os_type":           "linux",
-					"skip_create_image": skipCreateImage,
+					"kube_config":               unreachableKubeConfig(),
+					"name":                      "test-vm",
+					"namespace":                 "test-ns",
+					"iso_volume_name":           "test-iso",
+					"disk_size":                 "10Gi",
+					"instance_type":             "u1.medium",
+					"preference":                "fedora",
+					"os_type":                   "linux",
+					"installation_wait_timeout": "1m",
+					"skip_create_image":         skipCreateImage,
 				})
 				Expect(err).NotTo(HaveOccurred())
 
@@ -84,14 +85,15 @@ var _ = Describe("Builder", func() {
 		It("returns the context error when the build is cancelled", func() {
 			builder := &iso.Builder{}
 			_, _, err := builder.Prepare(map[string]interface{}{
-				"kube_config":     unreachableKubeConfig(),
-				"name":            "test-vm",
-				"namespace":       "test-ns",
-				"iso_volume_name": "test-iso",
-				"disk_size":       "10Gi",
-				"instance_type":   "u1.medium",
-				"preference":      "fedora",
-				"os_type":         "linux",
+				"kube_config":               unreachableKubeConfig(),
+				"name":                      "test-vm",
+				"namespace":                 "test-ns",
+				"iso_volume_name":           "test-iso",
+				"disk_size":                 "10Gi",
+				"instance_type":             "u1.medium",
+				"preference":                "fedora",
+				"os_type":                   "linux",
+				"installation_wait_timeout": "1m",
 			})
 			Expect(err).NotTo(HaveOccurred())
 

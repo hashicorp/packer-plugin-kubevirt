@@ -25,6 +25,8 @@ func validRawConfig(overrides map[string]interface{}) map[string]interface{} {
 		"disk_size":       "10Gi",
 		"instance_type":   "u1.medium",
 		"preference":      "fedora",
+		// Required without a communicator.
+		"installation_wait_timeout": "15m",
 	}
 	for k, v := range overrides {
 		raw[k] = v
@@ -93,6 +95,30 @@ var _ = Describe("Config", func() {
 				"preference_kind":    "virtualmachinepreferences",
 			}))
 			Expect(err).NotTo(HaveOccurred())
+		})
+	})
+
+	Context("Prepare installation_wait_timeout", func() {
+		It("is required without a communicator", func() {
+			c := &iso.Config{}
+			raw := validRawConfig(nil)
+			delete(raw, "installation_wait_timeout")
+			_, err := c.Prepare(raw)
+			Expect(err).To(MatchError(ContainSubstring("installation_wait_timeout must be set when no communicator is configured")))
+		})
+
+		It("is optional with a communicator", func() {
+			c := &iso.Config{}
+			raw := validRawConfig(map[string]interface{}{"communicator": "ssh"})
+			delete(raw, "installation_wait_timeout")
+			_, err := c.Prepare(raw)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("must not be negative", func() {
+			c := &iso.Config{}
+			_, err := c.Prepare(validRawConfig(map[string]interface{}{"installation_wait_timeout": "-5m"}))
+			Expect(err).To(MatchError(ContainSubstring("installation_wait_timeout must not be negative")))
 		})
 	})
 

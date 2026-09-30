@@ -133,9 +133,9 @@ type Config struct {
 	// This is useful if the VM takes some time to boot and be ready to accept keystrokes.
 	BootWait time.Duration `mapstructure:"boot_wait" required:"false"`
 	// InstallationWaitTimeout is the amount of time to wait for the installation to be completed.
-	// When a communicator is configured, the builder connects to the VM once this
-	// time has elapsed. Without a communicator, this is the only way for the builder
-	// to know when the installation has finished.
+	// It is required when no communicator is configured, since the builder has no other way
+	// to know when the installation has finished. With a communicator, the builder connects
+	// to the VM once this time has elapsed.
 	InstallationWaitTimeout time.Duration `mapstructure:"installation_wait_timeout" required:"false"`
 	// Communicator is the type of communicator to use to connect to the VM.
 	// Supported values are "ssh" and "winrm".
@@ -258,6 +258,15 @@ func (c *Config) Prepare(raws ...interface{}) ([]string, error) {
 
 	if len(c.BootCommand) > 0 {
 		errs = packersdk.MultiErrorAppend(errs, validateBootCommand(c.BootCommand)...)
+	}
+
+	// Without a communicator the build stops the VM right after the boot
+	// command, so the installation would be interrupted.
+	switch {
+	case c.InstallationWaitTimeout < 0:
+		errs = packersdk.MultiErrorAppend(errs, errors.New("installation_wait_timeout must not be negative"))
+	case c.InstallationWaitTimeout == 0 && c.Communicator != "ssh" && c.Communicator != "winrm":
+		errs = packersdk.MultiErrorAppend(errs, errors.New("installation_wait_timeout must be set when no communicator is configured"))
 	}
 
 	networkNames := make(map[string]bool, len(c.Networks))
