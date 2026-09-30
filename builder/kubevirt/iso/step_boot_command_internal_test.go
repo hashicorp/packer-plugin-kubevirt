@@ -124,3 +124,43 @@ func TestStepBootCommandTypesAndClosesTheVNCConnection(t *testing.T) {
 		t.Fatalf("expected the key 'a' to be typed, got %v", typed)
 	}
 }
+
+func TestStepBootCommandClosesTheVNCConnectionWhenTheHandshakeFails(t *testing.T) {
+	clientEnd, serverEnd := net.Pipe()
+	t.Cleanup(func() { _ = serverEnd.Close() })
+
+	// A server version the VNC client does not support fails the handshake.
+	closed := make(chan struct{})
+	go func() {
+		defer close(closed)
+		if _, err := serverEnd.Write([]byte("RFB 003.003\n")); err != nil {
+			return
+		}
+		_, _ = io.Copy(io.Discard, serverEnd)
+	}()
+
+	ctrl := gomock.NewController(t)
+	vmis := kubecli.NewMockVirtualMachineInstanceInterface(ctrl)
+	vmis.EXPECT().VNC("vm").Return(&pipeStream{conn: clientEnd}, nil)
+	client := kubecli.NewMockKubevirtClient(ctrl)
+	client.EXPECT().VirtualMachineInstance("ns").Return(vmis)
+
+	step := &StepBootCommand{
+		config: Config{Name: "vm", Namespace: "ns", BootCommand: []string{"a"}},
+		client: client,
+	}
+
+	state := newBootCommandState()
+	if action := step.Run(context.Background(), state); action != multistep.ActionHalt {
+		t.Fatalf("expected the step to halt, got %v", action)
+	}
+	if err, _ := state.Get("error").(error); err == nil || !strings.Contains(err.Error(), "failed to establish a VNC session") {
+		t.Fatalf("unexpected error: %v", state.Get("error"))
+	}
+
+	select {
+	case <-closed:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the VNC connection was left open after the failed handshake")
+	}
+}
