@@ -9,6 +9,7 @@ package iso
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -30,8 +31,7 @@ import (
 // Source: https://kubevirt.io/api-reference/v1.6.0/definitions.html#_v1_network
 type Network struct {
 	// Network name.
-	// Must be a DNS_LABEL and unique within the VM.
-	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+	// Can only contain letters, digits, '-' and '_', and must be unique within the VM.
 	Name string `mapstructure:"name"`
 
 	// NetworkSource represents the network type and the source interface that should be connected to the VM.
@@ -200,13 +200,20 @@ func (c *Config) Prepare(raws ...interface{}) ([]string, error) {
 	}
 
 	errs = packersdk.MultiErrorAppend(errs, validateName("name", c.Name, validation.IsDNS1123Subdomain)...)
+	// The root disk DataVolume of the VM is named after the image.
+	if rootDisk := c.Name + "-rootdisk"; len(rootDisk) > validation.DNS1123SubdomainMaxLength {
+		errs = packersdk.MultiErrorAppend(errs, fmt.Errorf("name is too long: the root disk DataVolume %q must be no more than %d characters",
+			rootDisk, validation.DNS1123SubdomainMaxLength))
+	}
 	errs = packersdk.MultiErrorAppend(errs, validateName("namespace", c.Namespace, validation.IsDNS1123Label)...)
 	errs = packersdk.MultiErrorAppend(errs, validateName("iso_volume_name", c.IsoVolumeName, validation.IsDNS1123Subdomain)...)
 
 	if c.DiskSize == "" {
 		errs = packersdk.MultiErrorAppend(errs, errors.New("disk_size must be specified"))
-	} else if _, err := resource.ParseQuantity(c.DiskSize); err != nil {
+	} else if size, err := resource.ParseQuantity(c.DiskSize); err != nil {
 		errs = packersdk.MultiErrorAppend(errs, fmt.Errorf("disk_size %q is not a valid Kubernetes quantity (e.g. \"10Gi\"): %w", c.DiskSize, err))
+	} else if size.Sign() <= 0 {
+		errs = packersdk.MultiErrorAppend(errs, fmt.Errorf("disk_size %q must be greater than zero", c.DiskSize))
 	}
 
 	if c.InstanceType == "" {
@@ -242,7 +249,7 @@ func (c *Config) Prepare(raws ...interface{}) ([]string, error) {
 	switch v1.DiskBus(c.DiskBus) {
 	case v1.DiskBusSCSI, v1.DiskBusSATA, v1.DiskBusUSB:
 	case v1.DiskBusVirtio:
-		errs = packersdk.MultiErrorAppend(errs, errors.New("disk_bus \"virtio\" is not supported by KubeVirt for CD-ROM devices, use \"scsi\" or \"sata\""))
+		errs = packersdk.MultiErrorAppend(errs, errors.New("disk_bus \"virtio\" is not supported by KubeVirt for CD-ROM devices, use \"scsi\", \"sata\" or \"usb\""))
 	default:
 		errs = packersdk.MultiErrorAppend(errs, fmt.Errorf("disk_bus %q is not supported, use \"scsi\", \"sata\" or \"usb\"", c.DiskBus))
 	}
@@ -273,6 +280,8 @@ func (c *Config) Prepare(raws ...interface{}) ([]string, error) {
 	for i, n := range c.Networks {
 		if n.Name == "" {
 			errs = packersdk.MultiErrorAppend(errs, fmt.Errorf("networks[%d]: name must be specified", i))
+		} else if !networkNameFormat.MatchString(n.Name) {
+			errs = packersdk.MultiErrorAppend(errs, fmt.Errorf("network %q: the name can only contain letters, digits, '-' and '_'", n.Name))
 		} else if networkNames[n.Name] {
 			errs = packersdk.MultiErrorAppend(errs, fmt.Errorf("network %q: names must be unique", n.Name))
 		}
@@ -288,6 +297,9 @@ func (c *Config) Prepare(raws ...interface{}) ([]string, error) {
 	}
 	return nil, nil
 }
+
+// networkNameFormat is the format KubeVirt accepts for network and interface names.
+var networkNameFormat = regexp.MustCompile(`^[A-Za-z0-9-_]+$`)
 
 // validateName reports an error if a Kubernetes object name is missing or
 // does not satisfy the given apimachinery validation rule.

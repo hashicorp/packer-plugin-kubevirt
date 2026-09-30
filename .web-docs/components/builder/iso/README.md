@@ -159,8 +159,7 @@ Source: https://kubevirt.io/api-reference/v1.6.0/definitions.html#_v1_network
 <!-- Code generated from the comments of the Network struct in builder/kubevirt/iso/config.go; DO NOT EDIT MANUALLY -->
 
 - `name` (string) - Network name.
-  Must be a DNS_LABEL and unique within the VM.
-  More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+  Can only contain letters, digits, '-' and '_', and must be unique within the VM.
 
 <!-- End of code generated from the comments of the Network struct in builder/kubevirt/iso/config.go; -->
 

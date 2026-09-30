@@ -88,6 +88,14 @@ var _ = Describe("Config", func() {
 			Expect(c.PreferenceKind).To(Equal("virtualmachineclusterpreference"))
 		})
 
+		It("accepts network names that KubeVirt accepts", func() {
+			c := &iso.Config{}
+			_, err := c.Prepare(validRawConfig(map[string]interface{}{
+				"networks": []map[string]interface{}{{"name": "Net_1", "pod": map[string]interface{}{}}},
+			}))
+			Expect(err).NotTo(HaveOccurred())
+		})
+
 		It("accepts namespaced kinds the way KubeVirt resolves them", func() {
 			c := &iso.Config{}
 			_, err := c.Prepare(validRawConfig(map[string]interface{}{
@@ -139,12 +147,14 @@ var _ = Describe("Config", func() {
 				Expect(err).To(MatchError(ContainSubstring(expected)))
 			},
 			Entry("disk_size that is not a quantity", map[string]interface{}{"disk_size": "10 GB"}, "disk_size \"10 GB\" is not a valid Kubernetes quantity"),
+			Entry("disk_size that is not positive", map[string]interface{}{"disk_size": "0"}, "disk_size \"0\" must be greater than zero"),
+			Entry("name too long for the root disk", map[string]interface{}{"name": strings.Repeat("a", 250)}, "name is too long: the root disk DataVolume"),
 			Entry("name that is not a DNS subdomain", map[string]interface{}{"name": "Fedora_Image"}, "name \"Fedora_Image\" is invalid"),
 			Entry("namespace that is not a DNS label", map[string]interface{}{"namespace": "my.images"}, "namespace \"my.images\" is invalid"),
 			Entry("unsupported os_type", map[string]interface{}{"os_type": "bsd"}, "os_type \"bsd\" is not supported"),
 			Entry("unsupported instance_type_kind", map[string]interface{}{"instance_type_kind": "instancetype.kubevirt.io"}, "instance_type_kind \"instancetype.kubevirt.io\" is not supported"),
 			Entry("unsupported preference_kind", map[string]interface{}{"preference_kind": "preference"}, "preference_kind \"preference\" is not supported"),
-			Entry("virtio disk_bus for CD-ROMs", map[string]interface{}{"disk_bus": "virtio"}, "disk_bus \"virtio\" is not supported by KubeVirt for CD-ROM devices"),
+			Entry("virtio disk_bus for CD-ROMs", map[string]interface{}{"disk_bus": "virtio"}, "use \"scsi\", \"sata\" or \"usb\""),
 			Entry("unknown disk_bus", map[string]interface{}{"disk_bus": "ide"}, "disk_bus \"ide\" is not supported"),
 			Entry("malformed boot_command", map[string]interface{}{"boot_command": []string{"<wait0s>"}}, "boot_command is invalid"),
 			Entry("network with both pod and multus", map[string]interface{}{
@@ -157,6 +167,9 @@ var _ = Describe("Config", func() {
 			Entry("network without a name", map[string]interface{}{
 				"networks": []map[string]interface{}{{"pod": map[string]interface{}{}}},
 			}, "networks[0]: name must be specified"),
+			Entry("network name KubeVirt rejects", map[string]interface{}{
+				"networks": []map[string]interface{}{{"name": "net.1", "pod": map[string]interface{}{}}},
+			}, "network \"net.1\": the name can only contain letters, digits, '-' and '_'"),
 			Entry("networks with duplicate names", map[string]interface{}{
 				"networks": []map[string]interface{}{
 					{"name": "default", "pod": map[string]interface{}{}},
