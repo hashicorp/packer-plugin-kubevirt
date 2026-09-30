@@ -80,5 +80,28 @@ var _ = Describe("Builder", func() {
 			Entry("when a bootable volume is requested", false),
 			Entry("when skip_create_image is set", true),
 		)
+
+		It("returns the context error when the build is cancelled", func() {
+			builder := &iso.Builder{}
+			_, _, err := builder.Prepare(map[string]interface{}{
+				"kube_config":     unreachableKubeConfig(),
+				"name":            "test-vm",
+				"namespace":       "test-ns",
+				"iso_volume_name": "test-iso",
+				"disk_size":       "10Gi",
+				"instance_type":   "u1.medium",
+				"preference":      "fedora",
+				"os_type":         "linux",
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+
+			ui := &packer.BasicUi{Reader: strings.NewReader(""), Writer: io.Discard, ErrorWriter: io.Discard}
+			artifact, err := builder.Run(ctx, ui, &packer.MockHook{})
+			Expect(artifact).To(BeNil())
+			Expect(err).To(MatchError(context.Canceled))
+		})
 	})
 })
