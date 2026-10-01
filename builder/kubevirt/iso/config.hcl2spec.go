@@ -37,6 +37,9 @@ type FlatConfig struct {
 	BootCommand               []string          `mapstructure:"boot_command" required:"false" cty:"boot_command" hcl:"boot_command"`
 	BootWait                  *string           `mapstructure:"boot_wait" required:"false" cty:"boot_wait" hcl:"boot_wait"`
 	InstallationWaitTimeout   *string           `mapstructure:"installation_wait_timeout" required:"false" cty:"installation_wait_timeout" hcl:"installation_wait_timeout"`
+	StorageClassName          *string           `mapstructure:"storage_class_name" required:"false" cty:"storage_class_name" hcl:"storage_class_name"`
+	AccessMode                *string           `mapstructure:"access_mode" required:"false" cty:"access_mode" hcl:"access_mode"`
+	VolumeMode                *string           `mapstructure:"volume_mode" required:"false" cty:"volume_mode" hcl:"volume_mode"`
 	Type                      *string           `mapstructure:"communicator" cty:"communicator" hcl:"communicator"`
 	PauseBeforeConnect        *string           `mapstructure:"pause_before_connecting" cty:"pause_before_connecting" hcl:"pause_before_connecting"`
 	SSHHost                   *string           `mapstructure:"ssh_host" cty:"ssh_host" hcl:"ssh_host"`
@@ -136,6 +139,9 @@ func (*FlatConfig) HCL2Spec() map[string]hcldec.Spec {
 		"boot_command":                 &hcldec.AttrSpec{Name: "boot_command", Type: cty.List(cty.String), Required: false},
 		"boot_wait":                    &hcldec.AttrSpec{Name: "boot_wait", Type: cty.String, Required: false},
 		"installation_wait_timeout":    &hcldec.AttrSpec{Name: "installation_wait_timeout", Type: cty.String, Required: false},
+		"storage_class_name":           &hcldec.AttrSpec{Name: "storage_class_name", Type: cty.String, Required: false},
+		"access_mode":                  &hcldec.AttrSpec{Name: "access_mode", Type: cty.String, Required: false},
+		"volume_mode":                  &hcldec.AttrSpec{Name: "volume_mode", Type: cty.String, Required: false},
 		"communicator":                 &hcldec.AttrSpec{Name: "communicator", Type: cty.String, Required: false},
 		"pause_before_connecting":      &hcldec.AttrSpec{Name: "pause_before_connecting", Type: cty.String, Required: false},
 		"ssh_host":                     &hcldec.AttrSpec{Name: "ssh_host", Type: cty.String, Required: false},
@@ -321,6 +327,33 @@ func (*FlatPortForwardConfig) HCL2Spec() map[string]hcldec.Spec {
 	s := map[string]hcldec.Spec{
 		"ssh_local_port":   &hcldec.AttrSpec{Name: "ssh_local_port", Type: cty.Number, Required: false},
 		"winrm_local_port": &hcldec.AttrSpec{Name: "winrm_local_port", Type: cty.Number, Required: false},
+	}
+	return s
+}
+
+// FlatStorageConfig is an auto-generated flat version of StorageConfig.
+// Where the contents of a field with a `mapstructure:,squash` tag are bubbled up.
+type FlatStorageConfig struct {
+	StorageClassName *string `mapstructure:"storage_class_name" required:"false" cty:"storage_class_name" hcl:"storage_class_name"`
+	AccessMode       *string `mapstructure:"access_mode" required:"false" cty:"access_mode" hcl:"access_mode"`
+	VolumeMode       *string `mapstructure:"volume_mode" required:"false" cty:"volume_mode" hcl:"volume_mode"`
+}
+
+// FlatMapstructure returns a new FlatStorageConfig.
+// FlatStorageConfig is an auto-generated flat version of StorageConfig.
+// Where the contents a fields with a `mapstructure:,squash` tag are bubbled up.
+func (*StorageConfig) FlatMapstructure() interface{ HCL2Spec() map[string]hcldec.Spec } {
+	return new(FlatStorageConfig)
+}
+
+// HCL2Spec returns the hcl spec of a StorageConfig.
+// This spec is used by HCL to read the fields of StorageConfig.
+// The decoded values from this spec will then be applied to a FlatStorageConfig.
+func (*FlatStorageConfig) HCL2Spec() map[string]hcldec.Spec {
+	s := map[string]hcldec.Spec{
+		"storage_class_name": &hcldec.AttrSpec{Name: "storage_class_name", Type: cty.String, Required: false},
+		"access_mode":        &hcldec.AttrSpec{Name: "access_mode", Type: cty.String, Required: false},
+		"volume_mode":        &hcldec.AttrSpec{Name: "volume_mode", Type: cty.String, Required: false},
 	}
 	return s
 }

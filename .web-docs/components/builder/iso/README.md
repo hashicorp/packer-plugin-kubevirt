@@ -42,7 +42,9 @@ build {
 - `kube_config` (string) - KubeConfig is the path to the kubeconfig file used to connect to the cluster.
   A leading `~` is expanded to the home directory of the current user.
 
-- `name` (string) - Name is the name of the VM image.
+- `name` (string) - Name is the name of the VM image, used for the resulting DataVolume and DataSource
+  as well as for the temporary VM. The build stops before creating anything if a
+  DataVolume, DataSource or PersistentVolumeClaim with this name already exists.
 
 - `namespace` (string) - Namespace is the namespace in which to create the VM image.
 
@@ -53,8 +55,12 @@ build {
   quantity, e.g. "10Gi".
 
 - `instance_type` (string) - InstanceType is the name of the InstanceType resource to use in the temporary VM.
+  It is also recorded on the resulting DataSource as its default instance type,
+  which VMs created from it can infer.
 
 - `preference` (string) - Preference is the name of the Preference resource to use in the temporary VM.
+  It is also recorded on the resulting DataSource as its default preference,
+  which VMs created from it can infer.
 
 <!-- End of code generated from the comments of the Config struct in builder/kubevirt/iso/config.go; -->
 
@@ -141,6 +147,30 @@ build {
   Default is false.
 
 <!-- End of code generated from the comments of the Config struct in builder/kubevirt/iso/config.go; -->
+
+
+### Storage Configuration
+
+<!-- Code generated from the comments of the StorageConfig struct in builder/kubevirt/iso/config.go; DO NOT EDIT MANUALLY -->
+
+The following options configure the persistent volumes created by the builder:
+the root disk of the temporary VM and the bootable volume cloned from it.
+
+<!-- End of code generated from the comments of the StorageConfig struct in builder/kubevirt/iso/config.go; -->
+
+
+<!-- Code generated from the comments of the StorageConfig struct in builder/kubevirt/iso/config.go; DO NOT EDIT MANUALLY -->
+
+- `storage_class_name` (string) - StorageClassName is the name of the StorageClass of the volumes.
+  Defaults to the default StorageClass of the cluster.
+
+- `access_mode` (string) - AccessMode is the access mode of the volumes.
+  Supported values are "ReadWriteOnce" and "ReadWriteMany". Defaults to "ReadWriteOnce".
+
+- `volume_mode` (string) - VolumeMode is the volume mode of the volumes.
+  Supported values are "Filesystem" and "Block". Defaults to "Filesystem".
+
+<!-- End of code generated from the comments of the StorageConfig struct in builder/kubevirt/iso/config.go; -->
 
 
 ### Network Configuration

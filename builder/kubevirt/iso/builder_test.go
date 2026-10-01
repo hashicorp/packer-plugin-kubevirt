@@ -52,7 +52,7 @@ users:
 var _ = Describe("Builder", func() {
 	Context("Run", func() {
 		DescribeTable("returns the error of the failed step",
-			func(skipCreateImage bool) {
+			func(skipCreateImage bool, expected string) {
 				ui := &packer.BasicUi{
 					Reader:      strings.NewReader(""),
 					Writer:      io.Discard,
@@ -76,10 +76,10 @@ var _ = Describe("Builder", func() {
 
 				artifact, err := builder.Run(context.Background(), ui, &packer.MockHook{})
 				Expect(artifact).To(BeNil())
-				Expect(err).To(MatchError(ContainSubstring("failed to get the ISO DataVolume (test-ns/test-iso)")))
+				Expect(err).To(MatchError(ContainSubstring(expected)))
 			},
-			Entry("when a bootable volume is requested", false),
-			Entry("when skip_create_image is set", true),
+			Entry("when a bootable volume is requested", false, "failed to check whether the DataVolume test-ns/test-vm exists"),
+			Entry("when skip_create_image is set", true, "failed to get the ISO DataVolume (test-ns/test-iso)"),
 		)
 
 		It("returns the context error when the build is cancelled", func() {

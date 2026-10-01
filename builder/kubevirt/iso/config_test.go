@@ -199,6 +199,15 @@ var _ = Describe("Config", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
+		It("does not check label values when no DataSource is created", func() {
+			c := &iso.Config{}
+			_, err := c.Prepare(validRawConfig(map[string]interface{}{
+				"instance_type":     strings.Repeat("a", 64),
+				"skip_create_image": true,
+			}))
+			Expect(err).NotTo(HaveOccurred())
+		})
+
 		It("accepts namespaced kinds the way KubeVirt resolves them", func() {
 			c := &iso.Config{}
 			_, err := c.Prepare(validRawConfig(map[string]interface{}{
@@ -375,6 +384,10 @@ var _ = Describe("Config", func() {
 			Entry("name that is not a DNS subdomain", map[string]interface{}{"name": "Fedora_Image"}, "name \"Fedora_Image\" is invalid"),
 			Entry("namespace that is not a DNS label", map[string]interface{}{"namespace": "my.images"}, "namespace \"my.images\" is invalid"),
 			Entry("unsupported os_type", map[string]interface{}{"os_type": "bsd"}, "os_type \"bsd\" is not supported"),
+			Entry("unsupported access_mode", map[string]interface{}{"access_mode": "ReadOnlyMany"}, "access_mode \"ReadOnlyMany\" is not supported"),
+			Entry("unsupported volume_mode", map[string]interface{}{"volume_mode": "block"}, "volume_mode \"block\" is not supported"),
+			Entry("invalid storage_class_name", map[string]interface{}{"storage_class_name": "Fast SSD"}, "storage_class_name \"Fast SSD\" is invalid"),
+			Entry("instance_type that cannot be a label value", map[string]interface{}{"instance_type": strings.Repeat("a", 64)}, "cannot be used as a DataSource label"),
 			Entry("unsupported instance_type_kind", map[string]interface{}{"instance_type_kind": "instancetype.kubevirt.io"}, "instance_type_kind \"instancetype.kubevirt.io\" is not supported"),
 			Entry("unsupported preference_kind", map[string]interface{}{"preference_kind": "preference"}, "preference_kind \"preference\" is not supported"),
 			Entry("virtio disk_bus for CD-ROMs", map[string]interface{}{"disk_bus": "virtio"}, "use \"scsi\", \"sata\" or \"usb\""),

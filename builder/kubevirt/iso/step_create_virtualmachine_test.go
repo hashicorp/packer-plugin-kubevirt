@@ -17,11 +17,13 @@ import (
 	"github.com/hashicorp/packer-plugin-sdk/multistep"
 	"github.com/hashicorp/packer-plugin-sdk/packer"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	fakek8sclient "k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
+	"k8s.io/utils/ptr"
 	v1 "kubevirt.io/api/core/v1"
 	fakecdiclient "kubevirt.io/client-go/containerizeddataimporter/fake"
 	"kubevirt.io/client-go/kubecli"
@@ -173,6 +175,33 @@ var _ = Describe("StepCreateVirtualMachine", func() {
 			},
 			Entry("defaults to the upstream image", "", iso.DefaultVirtIOContainerImage),
 			Entry("uses a configured image", "mirror.example.com/kubevirt/virtio-container-disk:v1.5.2", "mirror.example.com/kubevirt/virtio-container-disk:v1.5.2"),
+		)
+
+		DescribeTable("configures the root disk storage",
+			func(storage iso.StorageConfig, storageClass *string, accessMode corev1.PersistentVolumeAccessMode, volumeMode *corev1.PersistentVolumeMode) {
+				step.Config.StorageConfig = storage
+
+				var created *v1.VirtualMachine
+				vmClient.Fake.PrependReactor("create", "virtualmachines", func(action k8stesting.Action) (bool, runtime.Object, error) {
+					created = action.(k8stesting.CreateAction).GetObject().(*v1.VirtualMachine)
+					created.Status.Ready = true
+					return false, created, nil
+				})
+
+				Expect(step.Run(context.Background(), state)).To(Equal(multistep.ActionContinue))
+				Expect(created).NotTo(BeNil())
+				Expect(created.Spec.DataVolumeTemplates).To(HaveLen(1))
+
+				pvc := created.Spec.DataVolumeTemplates[0].Spec.PVC
+				Expect(pvc.StorageClassName).To(Equal(storageClass))
+				Expect(pvc.AccessModes).To(ConsistOf(accessMode))
+				Expect(pvc.VolumeMode).To(Equal(volumeMode))
+				Expect(pvc.Resources.Requests.Storage().String()).To(Equal("1Gi"))
+			},
+			Entry("defaults", iso.StorageConfig{}, nil, corev1.ReadWriteOnce, nil),
+			Entry("configured",
+				iso.StorageConfig{StorageClassName: "ceph-rbd-virtualization", AccessMode: "ReadWriteMany", VolumeMode: "Block"},
+				ptr.To("ceph-rbd-virtualization"), corev1.ReadWriteMany, ptr.To(corev1.PersistentVolumeBlock)),
 		)
 
 		It("uses the pod network for networks without a source", func() {

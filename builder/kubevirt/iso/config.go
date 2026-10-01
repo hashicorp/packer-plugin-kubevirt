@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 //go:generate packer-sdc struct-markdown
-//go:generate packer-sdc mapstructure-to-hcl2 -type Config,Network,NetworkSource,PodNetwork,MultusNetwork,PortForwardConfig
+//go:generate packer-sdc mapstructure-to-hcl2 -type Config,Network,NetworkSource,PodNetwork,MultusNetwork,PortForwardConfig,StorageConfig
 
 package iso
 
@@ -25,6 +25,7 @@ import (
 	"github.com/hashicorp/packer-plugin-sdk/template/config"
 	"github.com/hashicorp/packer-plugin-sdk/template/interpolate"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/validation"
 
@@ -99,13 +100,29 @@ type PortForwardConfig struct {
 	WinRMLocalPort int `mapstructure:"winrm_local_port" required:"false"`
 }
 
+// The following options configure the persistent volumes created by the builder:
+// the root disk of the temporary VM and the bootable volume cloned from it.
+type StorageConfig struct {
+	// StorageClassName is the name of the StorageClass of the volumes.
+	// Defaults to the default StorageClass of the cluster.
+	StorageClassName string `mapstructure:"storage_class_name" required:"false"`
+	// AccessMode is the access mode of the volumes.
+	// Supported values are "ReadWriteOnce" and "ReadWriteMany". Defaults to "ReadWriteOnce".
+	AccessMode string `mapstructure:"access_mode" required:"false"`
+	// VolumeMode is the volume mode of the volumes.
+	// Supported values are "Filesystem" and "Block". Defaults to "Filesystem".
+	VolumeMode string `mapstructure:"volume_mode" required:"false"`
+}
+
 type Config struct {
 	common.PackerConfig `mapstructure:",squash"`
 
 	// KubeConfig is the path to the kubeconfig file used to connect to the cluster.
 	// A leading `~` is expanded to the home directory of the current user.
 	KubeConfig string `mapstructure:"kube_config" required:"true"`
-	// Name is the name of the VM image.
+	// Name is the name of the VM image, used for the resulting DataVolume and DataSource
+	// as well as for the temporary VM. The build stops before creating anything if a
+	// DataVolume, DataSource or PersistentVolumeClaim with this name already exists.
 	Name string `mapstructure:"name" required:"true"`
 	// Namespace is the namespace in which to create the VM image.
 	Namespace string `mapstructure:"namespace" required:"true"`
@@ -116,12 +133,16 @@ type Config struct {
 	// quantity, e.g. "10Gi".
 	DiskSize string `mapstructure:"disk_size" required:"true"`
 	// InstanceType is the name of the InstanceType resource to use in the temporary VM.
+	// It is also recorded on the resulting DataSource as its default instance type,
+	// which VMs created from it can infer.
 	InstanceType string `mapstructure:"instance_type" required:"true"`
 	// InstanceTypeKind is the kind of the InstanceType resource to use in the temporary VM.
 	// Supported values are "virtualmachineclusterinstancetype" and "virtualmachineinstancetype".
 	// Defaults to "virtualmachineclusterinstancetype".
 	InstanceTypeKind string `mapstructure:"instance_type_kind" required:"false"`
 	// Preference is the name of the Preference resource to use in the temporary VM.
+	// It is also recorded on the resulting DataSource as its default preference,
+	// which VMs created from it can infer.
 	Preference string `mapstructure:"preference" required:"true"`
 	// PreferenceKind is the kind of the Preference resource to use in the temporary VM.
 	// Supported values are "virtualmachineclusterpreference" and "virtualmachinepreference".
@@ -182,6 +203,8 @@ type Config struct {
 	// to know when the installation has finished. With a communicator, the builder connects
 	// to the VM once this time has elapsed.
 	InstallationWaitTimeout time.Duration `mapstructure:"installation_wait_timeout" required:"false"`
+
+	StorageConfig `mapstructure:",squash"`
 
 	Comm              communicator.Config `mapstructure:",squash"`
 	PortForwardConfig `mapstructure:",squash"`
@@ -253,6 +276,20 @@ func (c *Config) Prepare(raws ...interface{}) ([]string, error) {
 		errs = packersdk.MultiErrorAppend(errs, fmt.Errorf("disk_size %q must be greater than zero", c.DiskSize))
 	}
 
+	if c.StorageClassName != "" {
+		errs = packersdk.MultiErrorAppend(errs, validateName("storage_class_name", c.StorageClassName, validation.IsDNS1123Subdomain)...)
+	}
+	switch corev1.PersistentVolumeAccessMode(c.AccessMode) {
+	case "", corev1.ReadWriteOnce, corev1.ReadWriteMany:
+	default:
+		errs = packersdk.MultiErrorAppend(errs, fmt.Errorf("access_mode %q is not supported, use %q or %q", c.AccessMode, corev1.ReadWriteOnce, corev1.ReadWriteMany))
+	}
+	switch corev1.PersistentVolumeMode(c.VolumeMode) {
+	case "", corev1.PersistentVolumeFilesystem, corev1.PersistentVolumeBlock:
+	default:
+		errs = packersdk.MultiErrorAppend(errs, fmt.Errorf("volume_mode %q is not supported, use %q or %q", c.VolumeMode, corev1.PersistentVolumeFilesystem, corev1.PersistentVolumeBlock))
+	}
+
 	if c.InstanceType == "" {
 		errs = packersdk.MultiErrorAppend(errs, errors.New("instance_type must be specified"))
 	}
@@ -271,6 +308,19 @@ func (c *Config) Prepare(raws ...interface{}) ([]string, error) {
 	} else if !isSupportedKind(c.PreferenceKind, instancetypeapi.ClusterSingularPreferenceResourceName, instancetypeapi.SingularPreferenceResourceName) {
 		errs = packersdk.MultiErrorAppend(errs, fmt.Errorf("preference_kind %q is not supported, use %q or %q",
 			c.PreferenceKind, instancetypeapi.ClusterSingularPreferenceResourceName, instancetypeapi.SingularPreferenceResourceName))
+	}
+
+	// The instance type and preference are recorded as labels on the DataSource
+	// created at the end of the build, so check them before the installation.
+	if !c.SkipCreateImage {
+		for _, label := range []struct{ field, value string }{
+			{"instance_type", c.InstanceType},
+			{"preference", c.Preference},
+		} {
+			for _, msg := range validation.IsValidLabelValue(label.value) {
+				errs = packersdk.MultiErrorAppend(errs, fmt.Errorf("%s %q cannot be used as a DataSource label: %s", label.field, label.value, msg))
+			}
+		}
 	}
 
 	if c.OperatingSystemType == "" {

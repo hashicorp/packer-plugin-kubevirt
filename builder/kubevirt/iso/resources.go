@@ -65,7 +65,8 @@ func virtualMachine(
 	diskBus,
 	mediaLabel,
 	virtioContainerImage string,
-	networks []Network) *v1.VirtualMachine {
+	networks []Network,
+	storage StorageConfig) *v1.VirtualMachine {
 	var disks []v1.Disk
 	var volumes []v1.Volume
 
@@ -118,14 +119,7 @@ func virtualMachine(
 						Name: name + "-rootdisk",
 					},
 					Spec: cdiv1.DataVolumeSpec{
-						PVC: &corev1.PersistentVolumeClaimSpec{
-							Resources: corev1.VolumeResourceRequirements{
-								Requests: corev1.ResourceList{
-									corev1.ResourceName(corev1.ResourceStorage): resource.MustParse(diskSize),
-								},
-							},
-							AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-						},
+						PVC: persistentVolumeClaimSpec(diskSize, storage),
 						Source: &cdiv1.DataVolumeSource{
 							Blank: &cdiv1.DataVolumeBlankImage{},
 						},
@@ -148,7 +142,7 @@ func virtualMachine(
 	}
 }
 
-func cloneVolume(name, namespace, diskSize string) *cdiv1.DataVolume {
+func cloneVolume(name, namespace, diskSize string, storage StorageConfig) *cdiv1.DataVolume {
 	return &cdiv1.DataVolume{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: cdiv1.CDIGroupVersionKind.GroupVersion().String(),
@@ -167,30 +161,60 @@ func cloneVolume(name, namespace, diskSize string) *cdiv1.DataVolume {
 					Namespace: namespace,
 				},
 			},
-			PVC: &corev1.PersistentVolumeClaimSpec{
-				Resources: corev1.VolumeResourceRequirements{
-					Requests: corev1.ResourceList{
-						corev1.ResourceName(corev1.ResourceStorage): resource.MustParse(diskSize),
-					},
-				},
-				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-			},
+			PVC: persistentVolumeClaimSpec(diskSize, storage),
 		},
 	}
 }
 
-func sourceVolume(name, namespace, instanceType, preferenceName string) *cdiv1.DataSource {
+// persistentVolumeClaimSpec returns the claim of the root disk and of the
+// bootable volume cloned from it. Unset options keep the historical defaults:
+// ReadWriteOnce, and the default storage class and volume mode.
+func persistentVolumeClaimSpec(diskSize string, storage StorageConfig) *corev1.PersistentVolumeClaimSpec {
+	accessMode := corev1.ReadWriteOnce
+	if storage.AccessMode != "" {
+		accessMode = corev1.PersistentVolumeAccessMode(storage.AccessMode)
+	}
+
+	spec := &corev1.PersistentVolumeClaimSpec{
+		Resources: corev1.VolumeResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceStorage: resource.MustParse(diskSize),
+			},
+		},
+		AccessModes: []corev1.PersistentVolumeAccessMode{accessMode},
+	}
+	if storage.StorageClassName != "" {
+		spec.StorageClassName = ptr.To(storage.StorageClassName)
+	}
+	if storage.VolumeMode != "" {
+		spec.VolumeMode = ptr.To(corev1.PersistentVolumeMode(storage.VolumeMode))
+	}
+	return spec
+}
+
+func sourceVolume(name, namespace, instanceType, instanceTypeKind, preferenceName, preferenceKind string) *cdiv1.DataSource {
+	labels := map[string]string{
+		instancetypeapi.DefaultInstancetypeLabel: instanceType,
+		instancetypeapi.DefaultPreferenceLabel:   preferenceName,
+	}
+
+	// Without a kind label, KubeVirt looks up the cluster-wide resource when
+	// inferring the instance type and preference from the volume.
+	if instanceTypeKind != "" && !isSupportedKind(instanceTypeKind, instancetypeapi.ClusterSingularResourceName) {
+		labels[instancetypeapi.DefaultInstancetypeKindLabel] = instanceTypeKind
+	}
+	if preferenceKind != "" && !isSupportedKind(preferenceKind, instancetypeapi.ClusterSingularPreferenceResourceName) {
+		labels[instancetypeapi.DefaultPreferenceKindLabel] = preferenceKind
+	}
+
 	return &cdiv1.DataSource{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: cdiv1.CDIGroupVersionKind.GroupVersion().String(),
 			Kind:       "DataSource",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-			Labels: map[string]string{
-				"instancetype.kubevirt.io/default-instancetype": instanceType,
-				"instancetype.kubevirt.io/default-preference":   preferenceName,
-			},
+			Name:   name,
+			Labels: labels,
 		},
 		Spec: cdiv1.DataSourceSpec{
 			Source: cdiv1.DataSourceSource{
