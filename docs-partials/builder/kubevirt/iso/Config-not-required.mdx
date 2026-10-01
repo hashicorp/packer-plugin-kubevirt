@@ -1,16 +1,19 @@
 <!-- Code generated from the comments of the Config struct in builder/kubevirt/iso/config.go; DO NOT EDIT MANUALLY -->
 
 - `instance_type_kind` (string) - InstanceTypeKind is the kind of the InstanceType resource to use in the temporary VM.
-  Other supported value is "virtualmachineclusterinstancetype".
+  Supported values are "virtualmachineclusterinstancetype" and "virtualmachineinstancetype".
+  Defaults to "virtualmachineclusterinstancetype".
 
 - `preference_kind` (string) - PreferenceKind is the kind of the Preference resource to use in the temporary VM.
-  Other supported value is "virtualmachineclusterpreference".
+  Supported values are "virtualmachineclusterpreference" and "virtualmachinepreference".
+  Defaults to "virtualmachineclusterpreference".
 
 - `os_type` (string) - OperatingSystemType is the type of operating system to install.
   Supported values are "linux" and "windows". Default is "linux".
 
 - `disk_bus` (string) - DiskBus is the bus type to use for CD-ROM disk devices on the temporary VM.
-  Supported values are "scsi", "sata", and "virtio".
+  Supported values are "scsi", "sata", and "usb". KubeVirt does not support
+  "virtio" for CD-ROM devices.
   Defaults to "scsi", which is compatible with both x86 and arm64 architectures.
   Use "sata" on x86 clusters if required by your storage configuration.
 
@@ -31,6 +34,11 @@
 
 - `boot_wait` (duration string | ex: "1h5m2s") - BootWait is the amount of time to wait before sending the boot command.
   This is useful if the VM takes some time to boot and be ready to accept keystrokes.
+
+- `installation_wait_timeout` (duration string | ex: "1h5m2s") - InstallationWaitTimeout is the amount of time to wait for the installation to be completed.
+  It is required when no communicator is configured, since the builder has no other way
+  to know when the installation has finished. With a communicator, the builder connects
+  to the VM once this time has elapsed.
 
 - `communicator` (string) - Communicator is the type of communicator to use to connect to the VM.
   Supported values are "ssh" and "winrm".

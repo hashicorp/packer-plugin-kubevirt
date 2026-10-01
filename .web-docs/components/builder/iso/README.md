@@ -1,5 +1,5 @@
 Type: `kubevirt-iso`
-Artifact BuilderId: `kubevirt.iso`
+Artifact BuilderId: `packer.kubevirt.iso`
 
 The KubeVirt ISO builder creates VM image inside a Kubernetes cluster from
 ISO file. The builder supports Linux and Windows operating systems. Provisioning is done
@@ -39,7 +39,8 @@ build {
 
 <!-- Code generated from the comments of the Config struct in builder/kubevirt/iso/config.go; DO NOT EDIT MANUALLY -->
 
-- `kube_config` (string) - KubeConfig is the path to the kubeconfig file.
+- `kube_config` (string) - KubeConfig is the path to the kubeconfig file used to connect to the cluster.
+  A leading `~` is expanded to the home directory of the current user.
 
 - `name` (string) - Name is the name of the VM image.
 
@@ -48,13 +49,12 @@ build {
 - `iso_volume_name` (string) - ISO Volume Name is the name of the DataVolume resource that contains the installation ISO.
   This DataVolume must already exist in the namespace.
 
-- `disk_size` (string) - DiskSize is the size of the root disk to of the temporary VM.
+- `disk_size` (string) - DiskSize is the size of the root disk of the temporary VM, as a Kubernetes
+  quantity, e.g. "10Gi".
 
 - `instance_type` (string) - InstanceType is the name of the InstanceType resource to use in the temporary VM.
 
 - `preference` (string) - Preference is the name of the Preference resource to use in the temporary VM.
-
-- `installation_wait_timeout` (duration string | ex: "1h5m2s") - InstallationWaitTimeout is the amount of time to wait for the installation to be completed.
 
 <!-- End of code generated from the comments of the Config struct in builder/kubevirt/iso/config.go; -->
 
@@ -64,16 +64,19 @@ build {
 <!-- Code generated from the comments of the Config struct in builder/kubevirt/iso/config.go; DO NOT EDIT MANUALLY -->
 
 - `instance_type_kind` (string) - InstanceTypeKind is the kind of the InstanceType resource to use in the temporary VM.
-  Other supported value is "virtualmachineclusterinstancetype".
+  Supported values are "virtualmachineclusterinstancetype" and "virtualmachineinstancetype".
+  Defaults to "virtualmachineclusterinstancetype".
 
 - `preference_kind` (string) - PreferenceKind is the kind of the Preference resource to use in the temporary VM.
-  Other supported value is "virtualmachineclusterpreference".
+  Supported values are "virtualmachineclusterpreference" and "virtualmachinepreference".
+  Defaults to "virtualmachineclusterpreference".
 
 - `os_type` (string) - OperatingSystemType is the type of operating system to install.
   Supported values are "linux" and "windows". Default is "linux".
 
 - `disk_bus` (string) - DiskBus is the bus type to use for CD-ROM disk devices on the temporary VM.
-  Supported values are "scsi", "sata", and "virtio".
+  Supported values are "scsi", "sata", and "usb". KubeVirt does not support
+  "virtio" for CD-ROM devices.
   Defaults to "scsi", which is compatible with both x86 and arm64 architectures.
   Use "sata" on x86 clusters if required by your storage configuration.
 
@@ -94,6 +97,11 @@ build {
 
 - `boot_wait` (duration string | ex: "1h5m2s") - BootWait is the amount of time to wait before sending the boot command.
   This is useful if the VM takes some time to boot and be ready to accept keystrokes.
+
+- `installation_wait_timeout` (duration string | ex: "1h5m2s") - InstallationWaitTimeout is the amount of time to wait for the installation to be completed.
+  It is required when no communicator is configured, since the builder has no other way
+  to know when the installation has finished. With a communicator, the builder connects
+  to the VM once this time has elapsed.
 
 - `communicator` (string) - Communicator is the type of communicator to use to connect to the VM.
   Supported values are "ssh" and "winrm".
@@ -151,8 +159,7 @@ Source: https://kubevirt.io/api-reference/v1.6.0/definitions.html#_v1_network
 <!-- Code generated from the comments of the Network struct in builder/kubevirt/iso/config.go; DO NOT EDIT MANUALLY -->
 
 - `name` (string) - Network name.
-  Must be a DNS_LABEL and unique within the VM.
-  More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+  Can only contain letters, digits, '-' and '_', and must be unique within the VM.
 
 <!-- End of code generated from the comments of the Network struct in builder/kubevirt/iso/config.go; -->
 

@@ -148,6 +148,35 @@ var _ = Describe("StepCreateVirtualMachine", func() {
 			Entry("uses cidata for cloud-init / Ubuntu autoinstall", "cidata", "cidata"),
 		)
 
+		It("uses the pod network for networks without a source", func() {
+			step.Config.Networks = []iso.Network{
+				{Name: "default"},
+				{Name: "net1", NetworkSource: iso.NetworkSource{Multus: &iso.MultusNetwork{NetworkName: "multus-01"}}},
+			}
+
+			var created *v1.VirtualMachine
+			vmClient.Fake.PrependReactor("create", "virtualmachines", func(action k8stesting.Action) (bool, runtime.Object, error) {
+				created = action.(k8stesting.CreateAction).GetObject().(*v1.VirtualMachine)
+				created.Status.Ready = true
+				return false, created, nil
+			})
+
+			Expect(step.Run(context.Background(), state)).To(Equal(multistep.ActionContinue))
+			Expect(created).NotTo(BeNil())
+
+			networks := created.Spec.Template.Spec.Networks
+			interfaces := created.Spec.Template.Spec.Domain.Devices.Interfaces
+			Expect(networks).To(HaveLen(2))
+			Expect(interfaces).To(HaveLen(2))
+
+			Expect(networks[0].Pod).NotTo(BeNil())
+			Expect(interfaces[0].Masquerade).NotTo(BeNil())
+
+			Expect(networks[1].Multus).NotTo(BeNil())
+			Expect(networks[1].Multus.NetworkName).To(Equal("multus-01"))
+			Expect(interfaces[1].Bridge).NotTo(BeNil())
+		})
+
 		It("halts when VM creation fails", func() {
 			// Inject error into fake client
 			vmClient.Fake.PrependReactor("create", "virtualmachines", func(action k8stesting.Action) (bool, runtime.Object, error) {

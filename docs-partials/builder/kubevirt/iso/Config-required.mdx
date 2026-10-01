@@ -1,6 +1,7 @@
 <!-- Code generated from the comments of the Config struct in builder/kubevirt/iso/config.go; DO NOT EDIT MANUALLY -->
 
-- `kube_config` (string) - KubeConfig is the path to the kubeconfig file.
+- `kube_config` (string) - KubeConfig is the path to the kubeconfig file used to connect to the cluster.
+  A leading `~` is expanded to the home directory of the current user.
 
 - `name` (string) - Name is the name of the VM image.
 
@@ -9,12 +10,11 @@
 - `iso_volume_name` (string) - ISO Volume Name is the name of the DataVolume resource that contains the installation ISO.
   This DataVolume must already exist in the namespace.
 
-- `disk_size` (string) - DiskSize is the size of the root disk to of the temporary VM.
+- `disk_size` (string) - DiskSize is the size of the root disk of the temporary VM, as a Kubernetes
+  quantity, e.g. "10Gi".
 
 - `instance_type` (string) - InstanceType is the name of the InstanceType resource to use in the temporary VM.
 
 - `preference` (string) - Preference is the name of the Preference resource to use in the temporary VM.
-
-- `installation_wait_timeout` (duration string | ex: "1h5m2s") - InstallationWaitTimeout is the amount of time to wait for the installation to be completed.
 
 <!-- End of code generated from the comments of the Config struct in builder/kubevirt/iso/config.go; -->

@@ -18,17 +18,15 @@ import (
 	"github.com/hashicorp/packer-plugin-sdk/packerbuilderdata"
 	"github.com/hashicorp/packer-plugin-sdk/template/interpolate"
 
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 
 	"kubevirt.io/client-go/kubecli"
 )
 
 type Builder struct {
-	config    Config
-	runner    multistep.Runner
-	client    kubecli.KubevirtClient
-	clientset *kubernetes.Clientset
+	config Config
+	runner multistep.Runner
+	client kubecli.KubevirtClient
 }
 
 func (b *Builder) ConfigSpec() hcldec.ObjectSpec {
@@ -41,27 +39,19 @@ func (b *Builder) Prepare(raws ...interface{}) ([]string, []string, error) {
 		return nil, warnings, errs
 	}
 
-	kubeConfig := b.config.KubeConfig
-	if kubeConfig == "" {
-		return nil, warnings, fmt.Errorf("KUBECONFIG environment variable is not set")
+	restConfig, err := clientcmd.BuildConfigFromFlags("", b.config.KubeConfig)
+	if err != nil {
+		return nil, warnings, fmt.Errorf("failed to load kube_config %q: %w", b.config.KubeConfig, err)
 	}
 
-	client, err := kubecli.GetKubevirtClientFromFlags("", kubeConfig)
+	// The KubeVirt client also implements kubernetes.Interface, so it is used
+	// for the core Kubernetes resources as well.
+	client, err := kubecli.GetKubevirtClientFromRESTConfig(restConfig)
 	if err != nil {
-		return nil, warnings, fmt.Errorf("failed to get kubevirt client: %w", err)
+		return nil, warnings, fmt.Errorf("failed to create the KubeVirt client: %w", err)
 	}
 	b.client = client
 
-	config, err := clientcmd.BuildConfigFromFlags("", kubeConfig)
-	if err != nil {
-		return nil, warnings, fmt.Errorf("failed to build kubeconfig: %w", err)
-	}
-
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return nil, warnings, fmt.Errorf("failed to create Kubernetes clientset: %w", err)
-	}
-	b.clientset = clientset
 	return []string{"BootableVolumeName"}, warnings, nil
 }
 
@@ -80,7 +70,7 @@ func (b *Builder) Run(ctx context.Context, ui packer.Ui, hook packer.Hook) (pack
 		},
 		&StepCopyMediaFiles{
 			Config: b.config,
-			Client: b.clientset,
+			Client: b.client,
 		},
 		&StepCreateVirtualMachine{
 			Config: b.config,
