@@ -68,3 +68,33 @@ build {
 
 @include 'builder/kubevirt/iso/MultusNetwork.mdx'
 @include 'builder/kubevirt/iso/MultusNetwork-not-required.mdx'
+
+### Communicator Configuration
+
+The builder only connects to the VM when a `communicator` is set, which
+defaults to `none` for this builder. Set it to `ssh` or `winrm` to run
+provisioners in the VM.
+
+The `ssh_bastion_*` and `ssh_proxy_*` options are not supported: the
+communicator connects to a port forward on the machine running Packer, which a
+bastion host or a proxy cannot reach.
+
+@include 'builder/kubevirt/iso/PortForwardConfig.mdx'
+
+@include 'builder/kubevirt/iso/PortForwardConfig-not-required.mdx'
+
+#### Optional common fields:
+
+@include 'packer-plugin-sdk/communicator/Config-not-required.mdx'
+
+#### Optional SSH fields:
+
+@include 'builder/kubevirt/iso/SSH-not-required.mdx'
+
+@include 'packer-plugin-sdk/communicator/SSH-Private-Key-File-not-required.mdx'
+
+@include 'packer-plugin-sdk/communicator/SSH-Agent-Auth-not-required.mdx'
+
+#### Optional WinRM fields:
+
+@include 'packer-plugin-sdk/communicator/WinRM-not-required.mdx'

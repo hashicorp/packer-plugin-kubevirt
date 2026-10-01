@@ -53,13 +53,11 @@ source "kubevirt-iso" "ubuntu" {
   installation_wait_timeout = "15m" # Timeout for installation to complete
 
   # SSH configuration
-  communicator     = "ssh"
-  ssh_host         = "127.0.0.1"
-  ssh_local_port   = 2020
-  ssh_remote_port  = 22
-  ssh_username     = "ubuntu"
-  ssh_password     = "ubuntu"
-  ssh_wait_timeout = "20m"
+  # The builder connects through a port forward on 127.0.0.1 and a free local port.
+  communicator = "ssh"
+  ssh_username = "ubuntu"
+  ssh_password = "ubuntu"
+  ssh_timeout  = "20m"
 }
 
 build {

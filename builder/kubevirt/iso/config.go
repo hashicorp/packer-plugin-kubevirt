@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 //go:generate packer-sdc struct-markdown
-//go:generate packer-sdc mapstructure-to-hcl2 -type Config,Network,NetworkSource,PodNetwork,MultusNetwork
+//go:generate packer-sdc mapstructure-to-hcl2 -type Config,Network,NetworkSource,PodNetwork,MultusNetwork,PortForwardConfig
 
 package iso
 
@@ -15,6 +15,7 @@ import (
 
 	"github.com/hashicorp/packer-plugin-sdk/bootcommand"
 	"github.com/hashicorp/packer-plugin-sdk/common"
+	"github.com/hashicorp/packer-plugin-sdk/communicator"
 	packersdk "github.com/hashicorp/packer-plugin-sdk/packer"
 	"github.com/hashicorp/packer-plugin-sdk/pathing"
 	"github.com/hashicorp/packer-plugin-sdk/template/config"
@@ -77,6 +78,20 @@ const (
 	maxMediaLabelLength = 32
 )
 
+// The communicator reaches the VM through a port forward opened with the
+// KubeVirt API, which listens on `ssh_host` or `winrm_host` (defaults to
+// `127.0.0.1`) and forwards connections to `ssh_port` or `winrm_port` in the VM.
+type PortForwardConfig struct {
+	// SSHLocalPort is the local port the port forward to the VM listens on
+	// when using the SSH communicator. Defaults to a free port allocated by
+	// the operating system, so that concurrent builds do not conflict.
+	SSHLocalPort int `mapstructure:"ssh_local_port" required:"false"`
+	// WinRMLocalPort is the local port the port forward to the VM listens on
+	// when using the WinRM communicator. Defaults to a free port allocated by
+	// the operating system, so that concurrent builds do not conflict.
+	WinRMLocalPort int `mapstructure:"winrm_local_port" required:"false"`
+}
+
 type Config struct {
 	common.PackerConfig `mapstructure:",squash"`
 
@@ -137,33 +152,16 @@ type Config struct {
 	// to know when the installation has finished. With a communicator, the builder connects
 	// to the VM once this time has elapsed.
 	InstallationWaitTimeout time.Duration `mapstructure:"installation_wait_timeout" required:"false"`
-	// Communicator is the type of communicator to use to connect to the VM.
-	// Supported values are "ssh" and "winrm".
-	Communicator string `mapstructure:"communicator" required:"false"`
-	// SSHHost is the hostname or IP address to use to connect via SSH.
-	SSHHost string `mapstructure:"ssh_host" required:"false"`
-	// SSHLocalPort is the local port to use to connect via SSH.
-	SSHLocalPort int `mapstructure:"ssh_local_port" required:"false"`
-	// SSHRemotePort is the remote port to use to connect via SSH.
-	SSHRemotePort int `mapstructure:"ssh_remote_port" required:"false"`
-	// SSHUsername is the username to use to connect via SSH.
-	SSHUsername string `mapstructure:"ssh_username" required:"false"`
-	// SSHPassword is the password to use to connect via SSH.
-	SSHPassword string `mapstructure:"ssh_password" required:"false"`
-	// SSHWaitTimeout is the amount of time to wait for the SSH service to be available.
-	SSHWaitTimeout time.Duration `mapstructure:"ssh_wait_timeout" required:"false"`
-	// WinRMHost is the hostname or IP address to use to connect via WinRM.
-	WinRMHost string `mapstructure:"winrm_host" required:"false"`
-	// WinRMLocalPort is the local port to use to connect via WinRM.
-	WinRMLocalPort int `mapstructure:"winrm_local_port" required:"false"`
-	// WinRMRemotePort is the remote port to use to connect via WinRM.
-	WinRMRemotePort int `mapstructure:"winrm_remote_port" required:"false"`
-	// WinRMUsername is the username to use to connect via WinRM.
-	WinRMUsername string `mapstructure:"winrm_username" required:"false"`
-	// WinRMPassword is the password to use to connect via WinRM.
-	WinRMPassword string `mapstructure:"winrm_password" required:"false"`
-	// WinRMWaitTimeout is the amount of time to wait for the WinRM service to be available.
-	WinRMWaitTimeout time.Duration `mapstructure:"winrm_wait_timeout" required:"false"`
+
+	Comm              communicator.Config `mapstructure:",squash"`
+	PortForwardConfig `mapstructure:",squash"`
+
+	// Deprecated: use ssh_port.
+	SSHRemotePort int `mapstructure:"ssh_remote_port" required:"false" undocumented:"true"`
+	// Deprecated: use winrm_port.
+	WinRMRemotePort int `mapstructure:"winrm_remote_port" required:"false" undocumented:"true"`
+	// Deprecated: use winrm_timeout.
+	WinRMWaitTimeout time.Duration `mapstructure:"winrm_wait_timeout" required:"false" undocumented:"true"`
 
 	// KeepVM indicates whether to keep the temporary VM after the image has been created.
 	// If false, the VM and all its resources will be deleted after the image is created.
@@ -180,18 +178,22 @@ type Config struct {
 	// useful for iterative debugging when you do not want to produce a final image.
 	// Default is false.
 	SkipCreateImage bool `mapstructure:"skip_create_image" required:"false"`
+
+	ctx interpolate.Context
 }
 
 func (c *Config) Prepare(raws ...interface{}) ([]string, error) {
 	err := config.Decode(c, &config.DecodeOpts{
-		PluginType:  "builder.kubevirt.iso",
-		Interpolate: true,
+		PluginType:         "builder.kubevirt.iso",
+		Interpolate:        true,
+		InterpolateContext: &c.ctx,
 	}, raws...)
 	if err != nil {
 		return nil, err
 	}
 
 	var errs *packersdk.MultiError
+	warnings := c.applyDeprecatedOptions()
 
 	if c.KubeConfig == "" {
 		errs = packersdk.MultiErrorAppend(errs, errors.New("kube_config must be specified"))
@@ -267,12 +269,35 @@ func (c *Config) Prepare(raws ...interface{}) ([]string, error) {
 		errs = packersdk.MultiErrorAppend(errs, validateBootCommand(c.BootCommand)...)
 	}
 
+	// Keep the historical behaviour of this builder, which only connected to
+	// the VM when a communicator was explicitly configured.
+	if c.Comm.Type == "" {
+		c.Comm.Type = "none"
+	}
+	switch c.Comm.Type {
+	case "none", "ssh", "winrm":
+		errs = packersdk.MultiErrorAppend(errs, c.Comm.Prepare(&c.ctx)...)
+	default:
+		errs = packersdk.MultiErrorAppend(errs, fmt.Errorf("communicator %q is not supported, use \"ssh\", \"winrm\" or \"none\"", c.Comm.Type))
+	}
+
+	// The communicator connects to a port forward listening on this machine,
+	// which a bastion host or a proxy would try to reach on their own loopback.
+	if c.Comm.Type == "ssh" {
+		if c.Comm.SSHBastionHost != "" {
+			errs = packersdk.MultiErrorAppend(errs, errors.New("ssh_bastion_host is not supported: the builder connects to the VM through a port forward on this machine"))
+		}
+		if c.Comm.SSHProxyHost != "" {
+			errs = packersdk.MultiErrorAppend(errs, errors.New("ssh_proxy_host is not supported: the builder connects to the VM through a port forward on this machine"))
+		}
+	}
+
 	// Without a communicator the build stops the VM right after the boot
 	// command, so the installation would be interrupted.
 	switch {
 	case c.InstallationWaitTimeout < 0:
 		errs = packersdk.MultiErrorAppend(errs, errors.New("installation_wait_timeout must not be negative"))
-	case c.InstallationWaitTimeout == 0 && c.Communicator != "ssh" && c.Communicator != "winrm":
+	case c.InstallationWaitTimeout == 0 && c.Comm.Type == "none":
 		errs = packersdk.MultiErrorAppend(errs, errors.New("installation_wait_timeout must be set when no communicator is configured"))
 	}
 
@@ -293,9 +318,46 @@ func (c *Config) Prepare(raws ...interface{}) ([]string, error) {
 	}
 
 	if errs != nil && len(errs.Errors) > 0 {
-		return nil, errs
+		return warnings, errs
 	}
-	return nil, nil
+	return warnings, nil
+}
+
+// applyDeprecatedOptions maps the communicator options that predate the use
+// of the Packer SDK communicator configuration to their SDK equivalents. The
+// SDK options take precedence when both are set, except for ssh_wait_timeout,
+// which the SDK itself lets override ssh_timeout.
+func (c *Config) applyDeprecatedOptions() []string {
+	var warnings []string
+
+	if c.SSHRemotePort != 0 {
+		warnings = append(warnings, "ssh_remote_port is deprecated, use ssh_port instead")
+		if c.Comm.SSHPort == 0 {
+			c.Comm.SSHPort = c.SSHRemotePort
+		}
+	}
+	if c.Comm.SSHWaitTimeout != 0 {
+		warnings = append(warnings, "ssh_wait_timeout is deprecated, use ssh_timeout instead")
+		// Set ssh_timeout before the SDK applies its defaults: with neither
+		// option set, it also limits the number of SSH handshake attempts,
+		// which the builder never did when ssh_wait_timeout was used.
+		if c.Comm.SSHTimeout == 0 {
+			c.Comm.SSHTimeout = c.Comm.SSHWaitTimeout
+		}
+	}
+	if c.WinRMRemotePort != 0 {
+		warnings = append(warnings, "winrm_remote_port is deprecated, use winrm_port instead")
+		if c.Comm.WinRMPort == 0 {
+			c.Comm.WinRMPort = c.WinRMRemotePort
+		}
+	}
+	if c.WinRMWaitTimeout != 0 {
+		warnings = append(warnings, "winrm_wait_timeout is deprecated, use winrm_timeout instead")
+		if c.Comm.WinRMTimeout == 0 {
+			c.Comm.WinRMTimeout = c.WinRMWaitTimeout
+		}
+	}
+	return warnings
 }
 
 // networkNameFormat is the format KubeVirt accepts for network and interface names.
