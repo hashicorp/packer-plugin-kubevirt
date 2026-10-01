@@ -123,6 +123,14 @@ var _ = Describe("Config", func() {
 			Expect(c.MediaContent).To(HaveKeyWithValue("ks.cfg", content))
 		})
 
+		It("rejects media_content that does not parse as a Go template", func() {
+			c := &iso.Config{}
+			_, err := c.Prepare(validRawConfig(map[string]interface{}{
+				"media_content": map[string]string{"user-data": "## template: jinja\nhostname: {{ v1.local_hostname }}\n"},
+			}))
+			Expect(err).To(MatchError(ContainSubstring(`invalid 'media_content': template: root:2: function "v1" not defined`)))
+		})
+
 		It("rejects media_content that clashes with media_files", func() {
 			c := &iso.Config{}
 			_, err := c.Prepare(validRawConfig(map[string]interface{}{

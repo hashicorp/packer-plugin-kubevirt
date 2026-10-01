@@ -154,8 +154,9 @@ type Config struct {
 	// }
 	// ```
 	//
-	// The content is used as is, but Packer rejects content that is not valid
-	// Go template syntax, such as Jinja templates: use `media_files` for it.
+	// The content is used as is, without Packer template interpolation. Packer still
+	// checks that it parses as a Go template though, so content such as Jinja
+	// expressions (e.g. `{{ v1.local_hostname }}`) is rejected: use `media_files` for it.
 	MediaContent map[string]string `mapstructure:"media_content" required:"false"`
 	// MediaLabel is the volume label of the disk that holds the `media_files` and `media_content`.
 	// Different installers discover their configuration through different labels, e.g.
@@ -217,7 +218,8 @@ func (c *Config) Prepare(raws ...interface{}) ([]string, error) {
 		Interpolate:        true,
 		InterpolateContext: &c.ctx,
 		InterpolateFilter: &interpolate.RenderFilter{
-			// Keep the media content as is, like the content of media_files.
+			// Keep the media content as is, like the content of media_files. The
+			// SDK still validates excluded values as templates.
 			Exclude: []string{"media_content"},
 		},
 	}, raws...)
