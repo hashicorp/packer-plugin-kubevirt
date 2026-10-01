@@ -9,7 +9,11 @@ package iso
 import (
 	"errors"
 	"fmt"
+	"maps"
+	"os"
+	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -76,6 +80,9 @@ const (
 	// DefaultMediaLabel is the volume label that Anaconda (kickstart) auto-discovers.
 	DefaultMediaLabel   = "OEMDRV"
 	maxMediaLabelLength = 32
+
+	// DefaultVirtIOContainerImage provides the VirtIO drivers to Windows installations.
+	DefaultVirtIOContainerImage = "quay.io/kubevirt/virtio-container-disk:v1.5.2"
 )
 
 // The communicator reaches the VM through a port forward opened with the
@@ -133,13 +140,36 @@ type Config struct {
 	// If no networks are specified, a single pod network will be used.
 	Networks []Network `mapstructure:"networks" required:"false"`
 	// MediaFiles is a path list of files to be copied and used during the ISO installation.
+	// The files are stored in a ConfigMap and attached to the VM as a disk, where each
+	// file is named after its base name. The file names must therefore be unique, and
+	// the files must add up to at most 1 MiB.
 	MediaFiles []string `mapstructure:"media_files" required:"false"`
-	// MediaLabel is the volume label of the disk that holds the `media_files`.
+	// MediaContent is a map of file names to file contents to add to the media disk,
+	// alongside `media_files`. This is useful to render installer configuration from
+	// the template, for example with the `templatefile` function:
+	//
+	// ```hcl
+	// media_content = {
+	//   "ks.cfg" = templatefile("ks.cfg.pkrtpl", { password = var.password })
+	// }
+	// ```
+	//
+	// The content is used as is, without Packer template interpolation. Packer still
+	// checks that it parses as a Go template though, so content such as Jinja
+	// expressions (e.g. `{{ v1.local_hostname }}`) is rejected: use `media_files` for it.
+	MediaContent map[string]string `mapstructure:"media_content" required:"false"`
+	// MediaLabel is the volume label of the disk that holds the `media_files` and `media_content`.
 	// Different installers discover their configuration through different labels, e.g.
 	// "OEMDRV" for Anaconda kickstart (RHEL, Fedora) or "cidata" for cloud-init
 	// NoCloud / Subiquity autoinstall (Ubuntu). Only applies when `os_type` is "linux".
 	// Must be at most 32 characters long. Defaults to "OEMDRV".
 	MediaLabel string `mapstructure:"media_label" required:"false"`
+	// VirtIOContainerImage is the container disk image with the VirtIO drivers,
+	// attached as a CD-ROM to Windows VMs so that the installer can use VirtIO
+	// devices. Set it to use a registry mirror in disconnected clusters, or the
+	// drivers image of your distribution. Only applies when `os_type` is "windows".
+	// Defaults to "quay.io/kubevirt/virtio-container-disk:v1.5.2".
+	VirtIOContainerImage string `mapstructure:"virtio_container_image" required:"false"`
 	// BootCommand is a list of strings that represent the keystrokes to be sent to the VM console
 	// to automate the installation via a new VNC connection. The connection is closed once the
 	// keystrokes are sent. When no boot command is set, the builder does not connect to VNC.
@@ -187,6 +217,11 @@ func (c *Config) Prepare(raws ...interface{}) ([]string, error) {
 		PluginType:         "builder.kubevirt.iso",
 		Interpolate:        true,
 		InterpolateContext: &c.ctx,
+		InterpolateFilter: &interpolate.RenderFilter{
+			// Keep the media content as is, like the content of media_files. The
+			// SDK still validates excluded values as templates.
+			Exclude: []string{"media_content"},
+		},
 	}, raws...)
 	if err != nil {
 		return nil, err
@@ -260,6 +295,10 @@ func (c *Config) Prepare(raws ...interface{}) ([]string, error) {
 		c.MediaLabel = DefaultMediaLabel
 	}
 
+	if c.VirtIOContainerImage == "" {
+		c.VirtIOContainerImage = DefaultVirtIOContainerImage
+	}
+
 	// The media disk is an ISO 9660 image, whose volume identifier is limited to 32 characters.
 	if len(c.MediaLabel) > maxMediaLabelLength {
 		errs = packersdk.MultiErrorAppend(errs, fmt.Errorf("media_label %q must be at most %d characters long", c.MediaLabel, maxMediaLabelLength))
@@ -268,6 +307,8 @@ func (c *Config) Prepare(raws ...interface{}) ([]string, error) {
 	if len(c.BootCommand) > 0 {
 		errs = packersdk.MultiErrorAppend(errs, validateBootCommand(c.BootCommand)...)
 	}
+
+	errs = packersdk.MultiErrorAppend(errs, validateMedia(c.MediaFiles, c.MediaContent)...)
 
 	// Keep the historical behaviour of this builder, which only connected to
 	// the VM when a communicator was explicitly configured.
@@ -405,6 +446,56 @@ func validateBootCommand(bootCommand []string) []error {
 	var errs []error
 	for _, err := range sequence.Validate() {
 		errs = append(errs, fmt.Errorf("boot_command is invalid: %w", err))
+	}
+	return errs
+}
+
+// maxMediaSize is the maximum size of the data stored in a ConfigMap.
+const maxMediaSize = 1024 * 1024
+
+// validateMedia checks that the media files and content can be stored in the
+// ConfigMap backing the media disk, where each file is keyed by its name.
+func validateMedia(paths []string, content map[string]string) []error {
+	var errs []error
+	var totalSize int64
+	names := make(map[string]string, len(paths))
+
+	for _, path := range paths {
+		info, err := os.Stat(path)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("media_files: %w", err))
+			continue
+		}
+		if !info.Mode().IsRegular() {
+			errs = append(errs, fmt.Errorf("media_files: %q is not a regular file", path))
+			continue
+		}
+		totalSize += info.Size()
+
+		name := filepath.Base(path)
+		if other, ok := names[name]; ok {
+			errs = append(errs, fmt.Errorf("media_files: %q and %q have the same file name, which must be unique", other, path))
+		}
+		names[name] = path
+
+		for _, msg := range validation.IsConfigMapKey(name) {
+			errs = append(errs, fmt.Errorf("media_files: the file name of %q is invalid: %s", path, msg))
+		}
+	}
+
+	for _, name := range slices.Sorted(maps.Keys(content)) {
+		totalSize += int64(len(content[name]))
+
+		if path, ok := names[name]; ok {
+			errs = append(errs, fmt.Errorf("media_content: %q is also provided by media_files (%q)", name, path))
+		}
+		for _, msg := range validation.IsConfigMapKey(name) {
+			errs = append(errs, fmt.Errorf("media_content: the file name %q is invalid: %s", name, msg))
+		}
+	}
+
+	if totalSize > maxMediaSize {
+		errs = append(errs, fmt.Errorf("the media files add up to %d bytes, but a ConfigMap can hold at most %d bytes", totalSize, maxMediaSize))
 	}
 	return errs
 }

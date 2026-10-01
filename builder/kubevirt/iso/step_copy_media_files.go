@@ -31,7 +31,7 @@ func (s *StepCopyMediaFiles) Run(ctx context.Context, state multistep.StateBag) 
 
 	ui.Sayf("Creating a new ConfigMap to store media files (%s/%s)...", namespace, name)
 
-	configMap, err := configMap(name, mediaFiles)
+	configMap, err := configMap(name, mediaFiles, s.Config.MediaContent)
 	if err != nil {
 		return halt(state, fmt.Errorf("failed to read the media files: %w", err))
 	}

@@ -6,6 +6,7 @@ package iso
 import (
 	"os"
 	"path/filepath"
+	"unicode/utf8"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -19,8 +20,13 @@ import (
 
 const immediateBindingAnnotation = "cdi.kubevirt.io/storage.bind.immediate.requested"
 
-func configMap(name string, mediaFiles []string) (*corev1.ConfigMap, error) {
-	data := make(map[string]string)
+func configMap(name string, mediaFiles []string, mediaContent map[string]string) (*corev1.ConfigMap, error) {
+	data := make(map[string]string, len(mediaContent))
+	binaryData := make(map[string][]byte)
+
+	for filename, content := range mediaContent {
+		data[filename] = content
+	}
 
 	for _, path := range mediaFiles {
 		content, err := os.ReadFile(path)
@@ -28,15 +34,22 @@ func configMap(name string, mediaFiles []string) (*corev1.ConfigMap, error) {
 			return nil, err
 		}
 
+		// ConfigMap data must be UTF-8, other content (e.g. Windows driver
+		// files) would be corrupted when serialized, so store it as binary data.
 		filename := filepath.Base(path)
-		data[filename] = string(content)
+		if utf8.Valid(content) {
+			data[filename] = string(content)
+		} else {
+			binaryData[filename] = content
+		}
 	}
 
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Data: data,
+		Data:       data,
+		BinaryData: binaryData,
 	}, nil
 }
 
@@ -50,7 +63,8 @@ func virtualMachine(
 	preferenceKind,
 	osType,
 	diskBus,
-	mediaLabel string,
+	mediaLabel,
+	virtioContainerImage string,
 	networks []Network) *v1.VirtualMachine {
 	var disks []v1.Disk
 	var volumes []v1.Volume
@@ -73,7 +87,7 @@ func virtualMachine(
 
 	if osType == "windows" {
 		disks = getWindowsVirtualMachineDisks()
-		volumes = getWindowsVirtualMachineVolumes(name, isoVolumeName)
+		volumes = getWindowsVirtualMachineVolumes(name, isoVolumeName, virtioContainerImage)
 	}
 
 	for i, n := range networks {
@@ -301,7 +315,11 @@ func getWindowsVirtualMachineDisks() []v1.Disk {
 	}
 }
 
-func getWindowsVirtualMachineVolumes(name, isoVolumeName string) []v1.Volume {
+func getWindowsVirtualMachineVolumes(name, isoVolumeName, virtioContainerImage string) []v1.Volume {
+	if virtioContainerImage == "" {
+		virtioContainerImage = DefaultVirtIOContainerImage
+	}
+
 	return []v1.Volume{
 		{
 			Name: "cdrom",
@@ -333,7 +351,7 @@ func getWindowsVirtualMachineVolumes(name, isoVolumeName string) []v1.Volume {
 			Name: "virtiocontainerdisk",
 			VolumeSource: v1.VolumeSource{
 				ContainerDisk: &v1.ContainerDiskSource{
-					Image: "quay.io/kubevirt/virtio-container-disk:v1.5.2",
+					Image: virtioContainerImage,
 				},
 			},
 		},

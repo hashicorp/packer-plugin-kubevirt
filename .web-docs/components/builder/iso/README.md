@@ -84,12 +84,35 @@ build {
   If no networks are specified, a single pod network will be used.
 
 - `media_files` ([]string) - MediaFiles is a path list of files to be copied and used during the ISO installation.
+  The files are stored in a ConfigMap and attached to the VM as a disk, where each
+  file is named after its base name. The file names must therefore be unique, and
+  the files must add up to at most 1 MiB.
 
-- `media_label` (string) - MediaLabel is the volume label of the disk that holds the `media_files`.
+- `media_content` (map[string]string) - MediaContent is a map of file names to file contents to add to the media disk,
+  alongside `media_files`. This is useful to render installer configuration from
+  the template, for example with the `templatefile` function:
+  
+  ```hcl
+  media_content = {
+    "ks.cfg" = templatefile("ks.cfg.pkrtpl", { password = var.password })
+  }
+  ```
+  
+  The content is used as is, without Packer template interpolation. Packer still
+  checks that it parses as a Go template though, so content such as Jinja
+  expressions (e.g. `{{ v1.local_hostname }}`) is rejected: use `media_files` for it.
+
+- `media_label` (string) - MediaLabel is the volume label of the disk that holds the `media_files` and `media_content`.
   Different installers discover their configuration through different labels, e.g.
   "OEMDRV" for Anaconda kickstart (RHEL, Fedora) or "cidata" for cloud-init
   NoCloud / Subiquity autoinstall (Ubuntu). Only applies when `os_type` is "linux".
   Must be at most 32 characters long. Defaults to "OEMDRV".
+
+- `virtio_container_image` (string) - VirtIOContainerImage is the container disk image with the VirtIO drivers,
+  attached as a CD-ROM to Windows VMs so that the installer can use VirtIO
+  devices. Set it to use a registry mirror in disconnected clusters, or the
+  drivers image of your distribution. Only applies when `os_type` is "windows".
+  Defaults to "quay.io/kubevirt/virtio-container-disk:v1.5.2".
 
 - `boot_command` ([]string) - BootCommand is a list of strings that represent the keystrokes to be sent to the VM console
   to automate the installation via a new VNC connection. The connection is closed once the

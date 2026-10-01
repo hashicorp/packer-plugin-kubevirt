@@ -148,6 +148,33 @@ var _ = Describe("StepCreateVirtualMachine", func() {
 			Entry("uses cidata for cloud-init / Ubuntu autoinstall", "cidata", "cidata"),
 		)
 
+		DescribeTable("attaches the VirtIO drivers to Windows VMs",
+			func(image, expectedImage string) {
+				step.Config.OperatingSystemType = "windows"
+				step.Config.VirtIOContainerImage = image
+
+				var created *v1.VirtualMachine
+				vmClient.Fake.PrependReactor("create", "virtualmachines", func(action k8stesting.Action) (bool, runtime.Object, error) {
+					created = action.(k8stesting.CreateAction).GetObject().(*v1.VirtualMachine)
+					created.Status.Ready = true
+					return false, created, nil
+				})
+
+				Expect(step.Run(context.Background(), state)).To(Equal(multistep.ActionContinue))
+				Expect(created).NotTo(BeNil())
+
+				var images []string
+				for _, vol := range created.Spec.Template.Spec.Volumes {
+					if vol.ContainerDisk != nil {
+						images = append(images, vol.ContainerDisk.Image)
+					}
+				}
+				Expect(images).To(ConsistOf(expectedImage))
+			},
+			Entry("defaults to the upstream image", "", iso.DefaultVirtIOContainerImage),
+			Entry("uses a configured image", "mirror.example.com/kubevirt/virtio-container-disk:v1.5.2", "mirror.example.com/kubevirt/virtio-container-disk:v1.5.2"),
+		)
+
 		It("uses the pod network for networks without a source", func() {
 			step.Config.Networks = []iso.Network{
 				{Name: "default"},

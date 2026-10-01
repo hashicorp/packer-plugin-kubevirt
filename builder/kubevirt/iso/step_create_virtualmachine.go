@@ -40,6 +40,7 @@ func (s *StepCreateVirtualMachine) Run(ctx context.Context, state multistep.Stat
 	osType := s.Config.OperatingSystemType
 	diskBus := s.Config.DiskBus
 	mediaLabel := s.Config.MediaLabel
+	virtioContainerImage := s.Config.VirtIOContainerImage
 	networks := s.Config.Networks
 
 	if osType == "" || (osType != "linux" && osType != "windows") {
@@ -57,6 +58,7 @@ func (s *StepCreateVirtualMachine) Run(ctx context.Context, state multistep.Stat
 		osType,
 		diskBus,
 		mediaLabel,
+		virtioContainerImage,
 		networks)
 
 	ui.Sayf("Creating a new temporary VirtualMachine (%s/%s)...", namespace, name)
