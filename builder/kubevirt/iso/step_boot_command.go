@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	kubevirtcommon "github.com/hashicorp/packer-plugin-kubevirt/builder/kubevirt/common"
 	"github.com/hashicorp/packer-plugin-sdk/bootcommand"
 	"github.com/hashicorp/packer-plugin-sdk/multistep"
 	"github.com/hashicorp/packer-plugin-sdk/packer"
@@ -51,12 +52,12 @@ func (s *StepBootCommand) Run(ctx context.Context, state multistep.StateBag) mul
 
 	streamInterface, err := s.client.VirtualMachineInstance(namespace).VNC(name)
 	if err != nil {
-		return halt(state, fmt.Errorf("failed to open a VNC connection to the VirtualMachineInstance (%s/%s): %w", namespace, name, err))
+		return kubevirtcommon.Halt(state, fmt.Errorf("failed to open a VNC connection to the VirtualMachineInstance (%s/%s): %w", namespace, name, err))
 	}
 
 	connection, err := vnc.Client(streamInterface.AsConn(), &vnc.ClientConfig{})
 	if err != nil {
-		return halt(state, fmt.Errorf("failed to establish a VNC session: %w", err))
+		return kubevirtcommon.Halt(state, fmt.Errorf("failed to establish a VNC session: %w", err))
 	}
 	// KubeVirt allows a single VNC session per VM, release it once typing is
 	// done so that it can be used to follow the installation.
@@ -66,17 +67,17 @@ func (s *StepBootCommand) Run(ctx context.Context, state multistep.StateBag) mul
 
 	command, err := interpolate.Render(bootCommand, &interpolate.Context{})
 	if err != nil {
-		return halt(state, fmt.Errorf("failed to render the boot command: %w", err))
+		return kubevirtcommon.Halt(state, fmt.Errorf("failed to render the boot command: %w", err))
 	}
 
 	sequence, err := bootcommand.GenerateExpressionSequence(command)
 	if err != nil {
-		return halt(state, fmt.Errorf("failed to parse the boot command: %w", err))
+		return kubevirtcommon.Halt(state, fmt.Errorf("failed to parse the boot command: %w", err))
 	}
 
 	driver := bootcommand.NewVNCDriver(connection, time.Duration(0))
 	if err := sequence.Do(ctx, driver); err != nil {
-		return halt(state, fmt.Errorf("failed to type the boot command: %w", err))
+		return kubevirtcommon.Halt(state, fmt.Errorf("failed to type the boot command: %w", err))
 	}
 	return multistep.ActionContinue
 }

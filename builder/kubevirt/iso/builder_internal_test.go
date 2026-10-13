@@ -129,11 +129,11 @@ func TestProvisionStepsConnectThroughThePortForward(t *testing.T) {
 	client.EXPECT().VirtualMachine("images").Return(nil).AnyTimes()
 	b.client = client
 
-	steps := b.provisionSteps()
+	steps := common.ProvisionSteps(b.config.BuilderConfig, b.client, b.config.Comm)
 	for _, step := range steps {
-		if forward, ok := step.(*StepStartPortForward); ok {
-			forward.ForwarderFunc = func(kind, namespace, name string, _ common.PortforwardableResource) PortForwarder {
-				return DefaultPortForwarder(kind, namespace, name, tunnel)
+		if forward, ok := step.(*common.StepStartPortForward); ok {
+			forward.ForwarderFunc = func(kind, namespace, name string, _ common.PortforwardableResource) common.PortForwardStep {
+				return common.DefaultPortForwarderFactory(kind, namespace, name, tunnel)
 			}
 		}
 	}

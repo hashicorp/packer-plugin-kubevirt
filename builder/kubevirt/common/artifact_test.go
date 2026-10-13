@@ -1,19 +1,21 @@
 // Copyright (c) Red Hat, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
-package iso
+package common
 
 import (
 	"testing"
 
-	registryimage "github.com/hashicorp/packer-plugin-sdk/packer/registry/image"
 	"github.com/mitchellh/mapstructure"
+
+	registryimage "github.com/hashicorp/packer-plugin-sdk/packer/registry/image"
 )
 
 func TestArtifact_BuilderId(t *testing.T) {
-	a := &Artifact{Name: "my-image", Namespace: "images"}
-	if got := a.BuilderId(); got != "packer.kubevirt.iso" {
-		t.Errorf("BuilderId() = %q, want %q", got, "packer.kubevirt.iso")
+	const builderID = "packer.kubevirt.test"
+	a := &Artifact{BuilderIDValue: builderID, Name: "my-image", Namespace: "images"}
+	if got := a.BuilderId(); got != builderID {
+		t.Errorf("BuilderId() = %q, want %q", got, builderID)
 	}
 }
 

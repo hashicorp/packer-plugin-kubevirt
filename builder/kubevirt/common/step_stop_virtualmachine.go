@@ -1,7 +1,7 @@
 // Copyright (c) Red Hat, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
-package iso
+package common
 
 import (
 	"context"
@@ -19,7 +19,7 @@ import (
 )
 
 type StepStopVirtualMachine struct {
-	Config Config
+	Config BuilderConfig
 	Client kubecli.KubevirtClient
 }
 
@@ -30,8 +30,6 @@ func (s *StepStopVirtualMachine) Run(ctx context.Context, state multistep.StateB
 
 	ui.Sayf("Stopping the temporary VirtualMachine (%s/%s)...", namespace, name)
 
-	// The VM status is updated concurrently by KubeVirt, e.g. while the guest
-	// shuts down after provisioning, so retry when the update conflicts.
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		vm, err := s.Client.VirtualMachine(namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
@@ -45,7 +43,7 @@ func (s *StepStopVirtualMachine) Run(ctx context.Context, state multistep.StateB
 		return nil
 	})
 	if err != nil {
-		return halt(state, err)
+		return Halt(state, err)
 	}
 	return multistep.ActionContinue
 }

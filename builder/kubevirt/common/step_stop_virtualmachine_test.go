@@ -1,7 +1,7 @@
 // Copyright (c) Red Hat, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
-package iso_test
+package common_test
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/hashicorp/packer-plugin-kubevirt/builder/kubevirt/iso"
+	"github.com/hashicorp/packer-plugin-kubevirt/builder/kubevirt/common"
 	"github.com/hashicorp/packer-plugin-sdk/multistep"
 	"github.com/hashicorp/packer-plugin-sdk/packer"
 
@@ -35,7 +35,7 @@ var _ = Describe("StepStopVirtualMachine", func() {
 
 	var (
 		state      *multistep.BasicStateBag
-		step       *iso.StepStopVirtualMachine
+		step       *common.StepStopVirtualMachine
 		vmClient   *kubevirtfake.Clientset
 		virtClient kubecli.KubevirtClient
 		mockCtrl   *gomock.Controller
@@ -66,8 +66,8 @@ var _ = Describe("StepStopVirtualMachine", func() {
 
 		virtClient, _ = kubecli.GetKubevirtClientFromClientConfig(nil)
 
-		step = &iso.StepStopVirtualMachine{
-			Config: iso.Config{
+		step = &common.StepStopVirtualMachine{
+			Config: common.BuilderConfig{
 				Name:      name,
 				Namespace: namespace,
 			},
