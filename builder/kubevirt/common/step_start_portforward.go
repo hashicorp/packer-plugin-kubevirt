@@ -1,7 +1,7 @@
 // Copyright (c) Red Hat, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
-package iso
+package common
 
 import (
 	"context"
@@ -9,7 +9,6 @@ import (
 	"log"
 	"net"
 
-	"github.com/hashicorp/packer-plugin-kubevirt/builder/kubevirt/common"
 	"github.com/hashicorp/packer-plugin-sdk/communicator"
 	"github.com/hashicorp/packer-plugin-sdk/multistep"
 	"github.com/hashicorp/packer-plugin-sdk/packer"
@@ -22,8 +21,17 @@ import (
 // there is no reason to expose the tunnel to the VM on other interfaces.
 const defaultForwardingAddress = "127.0.0.1"
 
+// PortForwardStep is a PortForwarder that can start forwarding and report errors.
+type PortForwardStep interface {
+	StartForwarding(address *net.IPAddr, port ForwardedPort) (net.Addr, error)
+	LastError() error
+	Close() error
+}
+
+type PortForwarderFactory func(kind, namespace, name string, resource PortforwardableResource) PortForwardStep
+
 type StepStartPortForward struct {
-	Config        Config
+	Config        BuilderConfig
 	Client        kubecli.KubevirtClient
 	ForwarderFunc PortForwarderFactory
 	// Comm is the communicator configuration used to connect to the VM. Once
@@ -31,16 +39,8 @@ type StepStartPortForward struct {
 	// the tunnel.
 	Comm *communicator.Config
 
-	forwarder PortForwarder
+	forwarder PortForwardStep
 }
-
-type PortForwarder interface {
-	StartForwarding(address *net.IPAddr, port common.ForwardedPort) (net.Addr, error)
-	LastError() error
-	Close() error
-}
-
-type PortForwarderFactory func(kind, namespace, name string, resource common.PortforwardableResource) PortForwarder
 
 func (s *StepStartPortForward) Run(ctx context.Context, state multistep.StateBag) multistep.StepAction {
 	var host string
@@ -73,35 +73,32 @@ func (s *StepStartPortForward) Run(ctx context.Context, state multistep.StateBag
 
 	address, err := net.ResolveIPAddr("ip", host)
 	if err != nil {
-		return halt(state, fmt.Errorf("failed to resolve the port forwarding address %q: %w", host, err))
+		return Halt(state, fmt.Errorf("failed to resolve the port forwarding address %q: %w", host, err))
 	}
 
-	// Use the factory if provided, otherwise fallback to default
 	factory := s.ForwarderFunc
 	if factory == nil {
-		factory = DefaultPortForwarder
+		factory = DefaultPortForwarderFactory
 	}
 	forwarder := factory("vm", namespace, name, s.Client.VirtualMachine(namespace))
 
-	// A local port of 0 lets the operating system allocate a free port, which
-	// avoids conflicts between concurrent builds.
-	listenAddr, err := forwarder.StartForwarding(address, common.ForwardedPort{
+	listenAddr, err := forwarder.StartForwarding(address, ForwardedPort{
 		Local:    localPort,
 		Remote:   remotePort,
-		Protocol: common.ProtocolTCP,
+		Protocol: ProtocolTCP,
 	})
 	if err != nil {
-		return halt(state, fmt.Errorf("failed to start port forwarding to the VirtualMachine (%s/%s): %w", namespace, name, err))
+		return Halt(state, fmt.Errorf("failed to start port forwarding to the VirtualMachine (%s/%s): %w", namespace, name, err))
 	}
 	s.forwarder = forwarder
 
 	tcpAddr, ok := listenAddr.(*net.TCPAddr)
 	if !ok {
-		return halt(state, fmt.Errorf("unexpected port forwarding listener address %v", listenAddr))
+		return Halt(state, fmt.Errorf("unexpected port forwarding listener address %v", listenAddr))
 	}
 
 	if s.Comm != nil {
-		switch s.Comm.Type {
+		switch s.Config.Comm.Type {
 		case "ssh":
 			s.Comm.SSHHost = tcpAddr.IP.String()
 			s.Comm.SSHPort = tcpAddr.Port
@@ -120,9 +117,6 @@ func (s *StepStartPortForward) Cleanup(state multistep.StateBag) {
 		return
 	}
 
-	// The communicator only reports a timeout when it cannot connect, while
-	// the tunnel error explains why, e.g. missing RBAC permissions for the
-	// portforward subresource or a network policy blocking the connection.
 	if _, connected := state.GetOk("communicator"); !connected {
 		if err := s.forwarder.LastError(); err != nil {
 			state.Get("ui").(packer.Ui).Errorf("Last port forwarding error for the VirtualMachine (%s/%s): %s",
@@ -136,8 +130,8 @@ func (s *StepStartPortForward) Cleanup(state multistep.StateBag) {
 	s.forwarder = nil
 }
 
-func DefaultPortForwarder(kind, namespace, name string, resource common.PortforwardableResource) PortForwarder {
-	return &common.PortForwarder{
+func DefaultPortForwarderFactory(kind, namespace, name string, resource PortforwardableResource) PortForwardStep {
+	return &PortForwarder{
 		Kind:      kind,
 		Namespace: namespace,
 		Name:      name,

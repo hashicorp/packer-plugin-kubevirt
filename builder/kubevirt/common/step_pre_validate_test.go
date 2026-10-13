@@ -1,7 +1,7 @@
 // Copyright (c) Red Hat, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
-package iso_test
+package common_test
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/hashicorp/packer-plugin-kubevirt/builder/kubevirt/iso"
+	"github.com/hashicorp/packer-plugin-kubevirt/builder/kubevirt/common"
 	"github.com/hashicorp/packer-plugin-sdk/multistep"
 	"github.com/hashicorp/packer-plugin-sdk/packer"
 
@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	fakek8sclient "k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
+
 	fakecdiclient "kubevirt.io/client-go/containerizeddataimporter/fake"
 	"kubevirt.io/client-go/kubecli"
 	cdiv1beta1 "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
@@ -37,7 +38,7 @@ var _ = Describe("StepPreValidate", func() {
 	var (
 		ctrl       *gomock.Controller
 		state      *multistep.BasicStateBag
-		step       *iso.StepPreValidate
+		step       *common.StepPreValidate
 		kubeClient *fakek8sclient.Clientset
 		cdiClient  *fakecdiclient.Clientset
 	)
@@ -62,8 +63,8 @@ var _ = Describe("StepPreValidate", func() {
 		kubecli.MockKubevirtClientInstance.EXPECT().CdiClient().Return(cdiClient).AnyTimes()
 		virtClient, _ := kubecli.GetKubevirtClientFromClientConfig(nil)
 
-		step = &iso.StepPreValidate{
-			Config: iso.Config{Name: name, Namespace: namespace},
+		step = &common.StepPreValidate{
+			Config: common.BuilderConfig{Name: name, Namespace: namespace},
 			Client: virtClient,
 		}
 	})

@@ -1,7 +1,7 @@
 // Copyright (c) Red Hat, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
-package iso_test
+package common_test
 
 import (
 	"context"
@@ -9,12 +9,11 @@ import (
 	"io"
 	"strings"
 
+	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/golang/mock/gomock"
-
-	"github.com/hashicorp/packer-plugin-kubevirt/builder/kubevirt/iso"
+	"github.com/hashicorp/packer-plugin-kubevirt/builder/kubevirt/common"
 	"github.com/hashicorp/packer-plugin-sdk/multistep"
 	"github.com/hashicorp/packer-plugin-sdk/packer"
 	"github.com/hashicorp/packer-plugin-sdk/packerbuilderdata"
@@ -37,7 +36,7 @@ var _ = Describe("StepCreateBootableVolume", func() {
 	var (
 		ctrl       *gomock.Controller
 		state      *multistep.BasicStateBag
-		step       *iso.StepCreateBootableVolume
+		step       *common.StepCreateBootableVolume
 		cdiClient  *fakecdiclient.Clientset
 		virtClient kubecli.KubevirtClient
 	)
@@ -59,8 +58,8 @@ var _ = Describe("StepCreateBootableVolume", func() {
 		kubecli.MockKubevirtClientInstance.EXPECT().CdiClient().Return(cdiClient).AnyTimes()
 		virtClient, _ = kubecli.GetKubevirtClientFromClientConfig(nil)
 
-		step = &iso.StepCreateBootableVolume{
-			Config: iso.Config{
+		step = &common.StepCreateBootableVolume{
+			Config: common.BuilderConfig{
 				Name:         name,
 				Namespace:    namespace,
 				DiskSize:     "10Gi",
@@ -154,7 +153,7 @@ var _ = Describe("StepCreateBootableVolume", func() {
 		)
 
 		It("creates the bootable volume with the configured storage", func() {
-			step.Config.StorageConfig = iso.StorageConfig{StorageClassName: "ceph-rbd-virtualization", AccessMode: "ReadWriteMany", VolumeMode: "Block"}
+			step.Config.StorageConfig = common.StorageConfig{StorageClassName: "ceph-rbd-virtualization", AccessMode: "ReadWriteMany", VolumeMode: "Block"}
 
 			var created *cdiv1beta1.DataVolume
 			cdiClient.PrependReactor("create", "datavolumes", func(action testing.Action) (bool, runtime.Object, error) {

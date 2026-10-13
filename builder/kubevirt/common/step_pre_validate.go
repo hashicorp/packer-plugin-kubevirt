@@ -1,7 +1,7 @@
 // Copyright (c) Red Hat, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
-package iso
+package common
 
 import (
 	"context"
@@ -21,7 +21,7 @@ import (
 // bootable volume it produces already exists, instead of after the whole
 // installation when the volume is created.
 type StepPreValidate struct {
-	Config Config
+	Config BuilderConfig
 	Client kubecli.KubevirtClient
 }
 
@@ -55,14 +55,12 @@ func (s *StepPreValidate) Run(ctx context.Context, state multistep.StateBag) mul
 		err := check.get()
 		switch {
 		case err == nil:
-			return halt(state, fmt.Errorf("a %s named %s/%s already exists, delete it or choose another name for the image", check.kind, namespace, name))
+			return Halt(state, fmt.Errorf("a %s named %s/%s already exists, delete it or choose another name for the image", check.kind, namespace, name))
 		case apierrors.IsNotFound(err):
 		case apierrors.IsForbidden(err):
-			// Building the image does not necessarily need this permission,
-			// so the check must not make it a requirement.
 			log.Printf("[WARN] not allowed to check whether the %s %s/%s exists: %s", check.kind, namespace, name, err)
 		default:
-			return halt(state, fmt.Errorf("failed to check whether the %s %s/%s exists: %w", check.kind, namespace, name, err))
+			return Halt(state, fmt.Errorf("failed to check whether the %s %s/%s exists: %w", check.kind, namespace, name, err))
 		}
 	}
 	return multistep.ActionContinue

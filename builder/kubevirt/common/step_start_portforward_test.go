@@ -1,7 +1,7 @@
 // Copyright (c) Red Hat, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
-package iso_test
+package common_test
 
 import (
 	"context"
@@ -15,7 +15,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/hashicorp/packer-plugin-kubevirt/builder/kubevirt/common"
-	"github.com/hashicorp/packer-plugin-kubevirt/builder/kubevirt/iso"
 	"github.com/hashicorp/packer-plugin-sdk/communicator"
 	"github.com/hashicorp/packer-plugin-sdk/multistep"
 	"github.com/hashicorp/packer-plugin-sdk/packer"
@@ -72,7 +71,7 @@ var _ = Describe("StepStartPortForward", func() {
 		mockVirt   *kubecli.MockKubevirtClient
 		state      *multistep.BasicStateBag
 		uiErr      *strings.Builder
-		step       *iso.StepStartPortForward
+		step       *common.StepStartPortForward
 		mockFwd    *mockPortForwarder
 	)
 
@@ -101,18 +100,18 @@ var _ = Describe("StepStartPortForward", func() {
 		virtClient, _ = kubecli.GetKubevirtClientFromClientConfig(nil)
 
 		mockFwd = &mockPortForwarder{}
-		step = &iso.StepStartPortForward{
-			Config: iso.Config{
+		step = &common.StepStartPortForward{
+			Config: common.BuilderConfig{
 				Name:      name,
 				Namespace: namespace,
 				Comm: communicator.Config{
 					Type: "ssh",
 					SSH:  communicator.SSH{SSHHost: "127.0.0.1", SSHPort: 22},
 				},
-				PortForwardConfig: iso.PortForwardConfig{SSHLocalPort: 2222},
+				PortForwardConfig: common.PortForwardConfig{SSHLocalPort: 2222},
 			},
 			Client: virtClient,
-			ForwarderFunc: func(kind, ns, n string, resource common.PortforwardableResource) iso.PortForwarder {
+			ForwarderFunc: func(kind, ns, n string, resource common.PortforwardableResource) common.PortForwardStep {
 				return mockFwd
 			},
 			Comm: &communicator.Config{Type: "ssh"},

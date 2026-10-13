@@ -7,8 +7,10 @@ import (
 	"context"
 	"fmt"
 
+	kubevirtcommon "github.com/hashicorp/packer-plugin-kubevirt/builder/kubevirt/common"
 	"github.com/hashicorp/packer-plugin-sdk/multistep"
 	"github.com/hashicorp/packer-plugin-sdk/packer"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"kubevirt.io/client-go/kubecli"
@@ -28,11 +30,11 @@ func (s *StepValidateIsoDataVolume) Run(ctx context.Context, state multistep.Sta
 
 	_, err := s.Client.CdiClient().CdiV1beta1().DataVolumes(isoVolumeNamespace).Get(ctx, isoVolumeName, metav1.GetOptions{})
 	if err != nil {
-		return halt(state, fmt.Errorf("failed to get the ISO DataVolume (%s/%s): %w", isoVolumeNamespace, isoVolumeName, err))
+		return kubevirtcommon.Halt(state, fmt.Errorf("failed to get the ISO DataVolume (%s/%s): %w", isoVolumeNamespace, isoVolumeName, err))
 	}
 
-	if err := WaitUntilDataVolumeSucceeded(ctx, s.Client, isoVolumeNamespace, isoVolumeName); err != nil {
-		return halt(state, fmt.Errorf("the ISO DataVolume (%s/%s) is not ready: %w", isoVolumeNamespace, isoVolumeName, err))
+	if err := kubevirtcommon.WaitUntilDataVolumeSucceeded(ctx, s.Client, isoVolumeNamespace, isoVolumeName); err != nil {
+		return kubevirtcommon.Halt(state, fmt.Errorf("the ISO DataVolume (%s/%s) is not ready: %w", isoVolumeNamespace, isoVolumeName, err))
 	}
 	return multistep.ActionContinue
 }

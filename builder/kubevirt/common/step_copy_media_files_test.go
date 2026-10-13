@@ -1,7 +1,7 @@
 // Copyright (c) Red Hat, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
-package iso_test
+package common_test
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/hashicorp/packer-plugin-kubevirt/builder/kubevirt/iso"
+	"github.com/hashicorp/packer-plugin-kubevirt/builder/kubevirt/common"
 	"github.com/hashicorp/packer-plugin-sdk/multistep"
 	"github.com/hashicorp/packer-plugin-sdk/packer"
 
@@ -34,7 +34,7 @@ var _ = Describe("StepCopyMediaFiles", func() {
 
 	var (
 		state      *multistep.BasicStateBag
-		step       *iso.StepCopyMediaFiles
+		step       *common.StepCopyMediaFiles
 		kubeClient *fakek8sclient.Clientset
 	)
 
@@ -56,8 +56,8 @@ var _ = Describe("StepCopyMediaFiles", func() {
 		Expect(os.WriteFile(file1, []byte("fake iso data 1"), 0o644)).To(Succeed())
 		Expect(os.WriteFile(file2, []byte("fake iso data 2"), 0o644)).To(Succeed())
 
-		step = &iso.StepCopyMediaFiles{
-			Config: iso.Config{
+		step = &common.StepCopyMediaFiles{
+			Config: common.BuilderConfig{
 				Name:       name,
 				Namespace:  namespace,
 				MediaFiles: []string{file1, file2},
@@ -106,7 +106,6 @@ var _ = Describe("StepCopyMediaFiles", func() {
 		})
 
 		It("halts when ConfigMap creation fails due to invalid media files", func() {
-			// Simulate invalid media file by injecting empty name
 			step.Config.MediaFiles = []string{""}
 
 			action := step.Run(context.Background(), state)
@@ -115,7 +114,6 @@ var _ = Describe("StepCopyMediaFiles", func() {
 		})
 
 		It("halts when ConfigMap creation fails due to API error", func() {
-			// Simulate API failure with reactor
 			kubeClient.PrependReactor("create", "configmaps", func(action testing.Action) (bool, runtime.Object, error) {
 				gr := schema.GroupResource{Group: "", Resource: "configmaps"}
 				return true, nil, errors.NewNotFound(gr, "fail")

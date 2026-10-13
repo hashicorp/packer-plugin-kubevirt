@@ -8,15 +8,17 @@ import (
 	"io"
 	"strings"
 
+	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	kubevirtcommon "github.com/hashicorp/packer-plugin-kubevirt/builder/kubevirt/common"
 	"github.com/hashicorp/packer-plugin-kubevirt/builder/kubevirt/iso"
 	"github.com/hashicorp/packer-plugin-sdk/multistep"
 	"github.com/hashicorp/packer-plugin-sdk/packer"
 
-	"github.com/golang/mock/gomock"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	fakecdiclient "kubevirt.io/client-go/containerizeddataimporter/fake"
 	"kubevirt.io/client-go/kubecli"
 	cdiv1beta1 "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
@@ -56,7 +58,7 @@ var _ = Describe("StepValidateIsoDataVolume", func() {
 
 		step = &iso.StepValidateIsoDataVolume{
 			Config: iso.Config{
-				Namespace:     namespace,
+				BuilderConfig: kubevirtcommon.BuilderConfig{Namespace: namespace},
 				IsoVolumeName: isoName,
 			},
 			Client: virtClient,

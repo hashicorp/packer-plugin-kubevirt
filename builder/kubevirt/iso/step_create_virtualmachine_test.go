@@ -5,7 +5,6 @@ package iso_test
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"strings"
 
@@ -13,15 +12,13 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	kubevirtcommon "github.com/hashicorp/packer-plugin-kubevirt/builder/kubevirt/common"
 	"github.com/hashicorp/packer-plugin-kubevirt/builder/kubevirt/iso"
 	"github.com/hashicorp/packer-plugin-sdk/multistep"
 	"github.com/hashicorp/packer-plugin-sdk/packer"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	fakek8sclient "k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/utils/ptr"
 	v1 "kubevirt.io/api/core/v1"
@@ -38,7 +35,6 @@ var _ = Describe("StepCreateVirtualMachine", func() {
 
 	var (
 		ctrl       *gomock.Controller
-		kubeClient *fakek8sclient.Clientset
 		cdiClient  *fakecdiclient.Clientset
 		virtClient kubecli.KubevirtClient
 		vmClient   *kubevirtfake.Clientset
@@ -58,13 +54,11 @@ var _ = Describe("StepCreateVirtualMachine", func() {
 		state = new(multistep.BasicStateBag)
 		state.Put("ui", ui)
 
-		kubeClient = fakek8sclient.NewSimpleClientset()
 		cdiClient = fakecdiclient.NewSimpleClientset()
 		vmClient = kubevirtfake.NewSimpleClientset()
 
 		kubecli.GetKubevirtClientFromClientConfig = kubecli.GetMockKubevirtClientFromClientConfig
 		kubecli.MockKubevirtClientInstance = kubecli.NewMockKubevirtClient(ctrl)
-		kubecli.MockKubevirtClientInstance.EXPECT().CoreV1().Return(kubeClient.CoreV1()).AnyTimes()
 		kubecli.MockKubevirtClientInstance.EXPECT().
 			VirtualMachine(gomock.Any()).
 			DoAndReturn(func(ns string) kubecli.VirtualMachineInterface {
@@ -76,16 +70,17 @@ var _ = Describe("StepCreateVirtualMachine", func() {
 
 		step = &iso.StepCreateVirtualMachine{
 			Config: iso.Config{
-				Name:                name,
-				Namespace:           namespace,
+				BuilderConfig: kubevirtcommon.BuilderConfig{
+					Name:             name,
+					Namespace:        namespace,
+					DiskSize:         "1Gi",
+					InstanceType:     "cx1.medium",
+					InstanceTypeKind: "instancetype.kubevirt.io",
+					Preference:       "fedora",
+					PreferenceKind:   "instancetype.kubevirt.io",
+				},
 				IsoVolumeName:       "iso-vol",
-				DiskSize:            "1Gi",
-				InstanceType:        "cx1.medium",
-				InstanceTypeKind:    "instancetype.kubevirt.io",
-				Preference:          "fedora",
-				PreferenceKind:      "instancetype.kubevirt.io",
 				OperatingSystemType: "linux",
-				KeepVM:              false,
 			},
 			Client: virtClient,
 		}
@@ -100,24 +95,6 @@ var _ = Describe("StepCreateVirtualMachine", func() {
 			step.Config.OperatingSystemType = "bsd"
 			action := step.Run(context.Background(), state)
 			Expect(action).To(Equal(multistep.ActionHalt))
-		})
-
-		It("continues when VM is created and becomes Ready", func() {
-			// Let Run create the VM, then mark it Ready
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			// Watch for VM creation and patch Ready status
-			vmClient.Fake.PrependReactor("create", "virtualmachines", func(action k8stesting.Action) (bool, runtime.Object, error) {
-				create := action.(k8stesting.CreateAction)
-				obj := create.GetObject().(*v1.VirtualMachine)
-				// Simulate that VM is created and becomes Ready
-				obj.Status.Ready = true
-				return false, obj, nil
-			})
-
-			action := step.Run(ctx, state)
-			Expect(action).To(Equal(multistep.ActionContinue))
 		})
 
 		DescribeTable("sets the media volume label",
@@ -178,7 +155,7 @@ var _ = Describe("StepCreateVirtualMachine", func() {
 		)
 
 		DescribeTable("configures the root disk storage",
-			func(storage iso.StorageConfig, storageClass *string, accessMode corev1.PersistentVolumeAccessMode, volumeMode *corev1.PersistentVolumeMode) {
+			func(storage kubevirtcommon.StorageConfig, storageClass *string, accessMode corev1.PersistentVolumeAccessMode, volumeMode *corev1.PersistentVolumeMode) {
 				step.Config.StorageConfig = storage
 
 				var created *v1.VirtualMachine
@@ -198,9 +175,9 @@ var _ = Describe("StepCreateVirtualMachine", func() {
 				Expect(pvc.VolumeMode).To(Equal(volumeMode))
 				Expect(pvc.Resources.Requests.Storage().String()).To(Equal("1Gi"))
 			},
-			Entry("defaults", iso.StorageConfig{}, nil, corev1.ReadWriteOnce, nil),
+			Entry("defaults", kubevirtcommon.StorageConfig{}, nil, corev1.ReadWriteOnce, nil),
 			Entry("configured",
-				iso.StorageConfig{StorageClassName: "ceph-rbd-virtualization", AccessMode: "ReadWriteMany", VolumeMode: "Block"},
+				kubevirtcommon.StorageConfig{StorageClassName: "ceph-rbd-virtualization", AccessMode: "ReadWriteMany", VolumeMode: "Block"},
 				ptr.To("ceph-rbd-virtualization"), corev1.ReadWriteMany, ptr.To(corev1.PersistentVolumeBlock)),
 		)
 
@@ -231,99 +208,6 @@ var _ = Describe("StepCreateVirtualMachine", func() {
 			Expect(networks[1].Multus).NotTo(BeNil())
 			Expect(networks[1].Multus.NetworkName).To(Equal("multus-01"))
 			Expect(interfaces[1].Bridge).NotTo(BeNil())
-		})
-
-		It("halts when VM creation fails", func() {
-			// Inject error into fake client
-			vmClient.Fake.PrependReactor("create", "virtualmachines", func(action k8stesting.Action) (bool, runtime.Object, error) {
-				return true, nil, fmt.Errorf("simulated create error")
-			})
-
-			action := step.Run(context.Background(), state)
-			Expect(action).To(Equal(multistep.ActionHalt))
-			Expect(state.Get("error")).To(MatchError(ContainSubstring("simulated create error")))
-		})
-
-		It("halts when VM never becomes Ready", func() {
-			ctx, cancel := context.WithCancel(context.Background())
-			cancel()
-
-			action := step.Run(ctx, state)
-			Expect(action).To(Equal(multistep.ActionHalt))
-			Expect(state.Get("error")).To(MatchError(ContainSubstring("did not become ready")))
-		})
-	})
-
-	Context("Cleanup", func() {
-		markReadyOnCreate := func() {
-			vmClient.Fake.PrependReactor("create", "virtualmachines", func(action k8stesting.Action) (bool, runtime.Object, error) {
-				obj := action.(k8stesting.CreateAction).GetObject().(*v1.VirtualMachine)
-				obj.Status.Ready = true
-				return false, obj, nil
-			})
-		}
-
-		It("keeps VM when KeepVM is true", func() {
-			markReadyOnCreate()
-			Expect(step.Run(context.Background(), state)).To(Equal(multistep.ActionContinue))
-
-			step.Config.KeepVM = true
-			step.Cleanup(state)
-
-			_, err := vmClient.KubevirtV1().VirtualMachines(namespace).Get(context.Background(), name, metav1.GetOptions{})
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		It("deletes VM when KeepVM is false", func() {
-			markReadyOnCreate()
-			Expect(step.Run(context.Background(), state)).To(Equal(multistep.ActionContinue))
-
-			step.Cleanup(state)
-
-			_, err := vmClient.KubevirtV1().VirtualMachines(namespace).Get(context.Background(), name, metav1.GetOptions{})
-			Expect(errors.IsNotFound(err)).To(BeTrue())
-		})
-
-		It("only deletes the VM instance it created", func() {
-			vmClient.Fake.PrependReactor("create", "virtualmachines", func(action k8stesting.Action) (bool, runtime.Object, error) {
-				obj := action.(k8stesting.CreateAction).GetObject().(*v1.VirtualMachine)
-				obj.UID = "created-uid"
-				obj.Status.Ready = true
-				return false, obj, nil
-			})
-			var deleteOptions metav1.DeleteOptions
-			vmClient.Fake.PrependReactor("delete", "virtualmachines", func(action k8stesting.Action) (bool, runtime.Object, error) {
-				deleteOptions = action.(k8stesting.DeleteAction).GetDeleteOptions()
-				return false, nil, nil
-			})
-
-			Expect(step.Run(context.Background(), state)).To(Equal(multistep.ActionContinue))
-			step.Cleanup(state)
-
-			Expect(deleteOptions.Preconditions).NotTo(BeNil())
-			Expect(deleteOptions.Preconditions.UID).To(HaveValue(BeEquivalentTo("created-uid")))
-			Expect(deleteOptions.GracePeriodSeconds).To(HaveValue(BeZero()))
-		})
-
-		It("does not delete a pre-existing VM with the same name", func() {
-			_, err := vmClient.KubevirtV1().VirtualMachines(namespace).Create(context.Background(),
-				&v1.VirtualMachine{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      name,
-						Namespace: namespace,
-					},
-				},
-				metav1.CreateOptions{})
-			Expect(err).NotTo(HaveOccurred())
-
-			action := step.Run(context.Background(), state)
-			Expect(action).To(Equal(multistep.ActionHalt))
-			Expect(state.Get("error")).To(MatchError(ContainSubstring("already exists")))
-
-			step.Cleanup(state)
-
-			_, err = vmClient.KubevirtV1().VirtualMachines(namespace).Get(context.Background(), name, metav1.GetOptions{})
-			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 })

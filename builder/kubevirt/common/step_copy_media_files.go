@@ -1,7 +1,7 @@
 // Copyright (c) Red Hat, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
-package iso
+package common
 
 import (
 	"context"
@@ -16,7 +16,7 @@ import (
 )
 
 type StepCopyMediaFiles struct {
-	Config Config
+	Config BuilderConfig
 	Client kubernetes.Interface
 
 	created bool
@@ -27,27 +27,24 @@ func (s *StepCopyMediaFiles) Run(ctx context.Context, state multistep.StateBag) 
 	ui := state.Get("ui").(packer.Ui)
 	name := s.Config.Name
 	namespace := s.Config.Namespace
-	mediaFiles := s.Config.MediaFiles
 
 	ui.Sayf("Creating a new ConfigMap to store media files (%s/%s)...", namespace, name)
 
-	configMap, err := configMap(name, mediaFiles, s.Config.MediaContent)
+	cm, err := ConfigMap(name, s.Config.MediaFiles, s.Config.MediaContent)
 	if err != nil {
-		return halt(state, fmt.Errorf("failed to read the media files: %w", err))
+		return Halt(state, fmt.Errorf("failed to read the media files: %w", err))
 	}
 
-	cm, err := s.Client.CoreV1().ConfigMaps(namespace).Create(ctx, configMap, metav1.CreateOptions{})
+	created, err := s.Client.CoreV1().ConfigMaps(namespace).Create(ctx, cm, metav1.CreateOptions{})
 	if err != nil {
-		return halt(state, fmt.Errorf("failed to create the ConfigMap (%s/%s): %w", namespace, name, err))
+		return Halt(state, fmt.Errorf("failed to create the ConfigMap (%s/%s): %w", namespace, name, err))
 	}
 	s.created = true
-	s.uid = cm.UID
+	s.uid = created.UID
 	return multistep.ActionContinue
 }
 
 func (s *StepCopyMediaFiles) Cleanup(state multistep.StateBag) {
-	// Never delete a ConfigMap that this build did not create, e.g. one that
-	// already existed with the same name and made the creation fail.
 	if !s.created {
 		return
 	}
@@ -58,5 +55,5 @@ func (s *StepCopyMediaFiles) Cleanup(state multistep.StateBag) {
 
 	ui.Sayf("Deleting ConfigMap (%s/%s)...", namespace, name)
 
-	_ = s.Client.CoreV1().ConfigMaps(namespace).Delete(context.Background(), name, deleteOnlyUID(s.uid))
+	_ = s.Client.CoreV1().ConfigMaps(namespace).Delete(context.Background(), name, DeleteOnlyUID(s.uid))
 }
