@@ -76,6 +76,42 @@ $ packer plugins install --path packer-plugin-kubevirt github.com/hashicorp/kube
 
 Refer to the usage guidance in the [examples](./examples/builder/kubevirt-iso) of this plugin.
 
+## Development
+
+### Running Tests
+
+Unit tests run without any external dependencies:
+
+```shell
+$ make test
+```
+
+### Running Acceptance Tests
+
+Acceptance tests run end-to-end builds against a real Kubernetes cluster. They require:
+
+- A Kubernetes cluster with [KubeVirt](https://kubevirt.io) and [CDI](https://github.com/kubevirt/containerized-data-importer) installed
+- [Packer](https://packer.io) installed locally
+- `KUBECONFIG` pointing to the cluster
+
+The tests create their own namespaces, import ISO images, build VMs, and clean up all resources automatically.
+
+```shell
+# Run all acceptance tests (Linux only)
+$ make testacc KUBECONFIG=~/.kube/config
+
+# Run a specific test (e.g. Fedora only)
+$ make testacc KUBECONFIG=~/.kube/config TEST=./builder/kubevirt/iso/ TEST_ARGS="-run TestAccISOBuilder_Fedora"
+
+# Include the Windows acceptance test
+# By setting `PACKER_ACC_WINDOWS_ACCEPT_EULA=true`, you are agreeing to the
+# applicable Microsoft end user license agreement(s) for each deployment or
+# installation for the Microsoft product(s).
+$ make testacc KUBECONFIG=~/.kube/config PACKER_ACC_WINDOWS_ACCEPT_EULA=true
+```
+
+> **Note**: Acceptance tests take a long time to complete (~25 min for Linux, ~45 min for Windows) as they download ISOs and perform full OS installations.
+
 ## Privacy Notice
 
 Individuals, including external contributors, who participate in this repository and related project activities may have personal information associated with their GitHub profiles, contributions, and repository activity processed for security, compliance, audit, vulnerability management, and related governance purposes.
