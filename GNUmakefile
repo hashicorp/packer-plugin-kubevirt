@@ -25,8 +25,10 @@ install-packer-sdc: ## Install packer sofware development command
 plugin-check: install-packer-sdc build
 	@packer-sdc plugin-check ${BINARY}
 
+KUBECONFIG?=$(shell echo $$KUBECONFIG)
+
 testacc: dev
-	@PACKER_ACC=1 go test -count $(COUNT) -v $(TEST) -timeout=120m
+	@PACKER_ACC=1 KUBECONFIG=$(KUBECONFIG) go test -count $(COUNT) -v $(TEST) -timeout=120m
 
 # The SDK documentation of the SSH communicator is copied without the bastion
 # and proxy options, which cannot reach the port forward of the builder.
