@@ -76,6 +76,68 @@ $ packer plugins install --path packer-plugin-kubevirt github.com/hashicorp/kube
 
 Refer to the usage guidance in the [examples](./examples/builder/kubevirt-iso) of this plugin.
 
+## Development
+
+### Running Tests
+
+Unit tests run without any external dependencies:
+
+```shell
+$ make test
+```
+
+### Running Acceptance Tests
+
+Acceptance tests run end-to-end builds against a real Kubernetes cluster. They require:
+
+- A Kubernetes cluster with [KubeVirt](https://kubevirt.io) and [CDI](https://github.com/kubevirt/containerized-data-importer) installed
+- [Packer](https://packer.io) installed locally
+- `KUBECONFIG` pointing to the cluster
+
+The tests create their own namespaces, import ISO images, build VMs, and clean up all resources automatically.
+
+```shell
+# Run all acceptance tests (Linux only)
+$ make testacc KUBECONFIG=~/.kube/config
+
+# Run a specific test (e.g. Fedora only)
+$ make testacc KUBECONFIG=~/.kube/config TEST=./builder/kubevirt/iso/ TEST_ARGS="-run TestAccISOBuilder_Fedora"
+
+# Include the Windows acceptance test
+# By setting `PACKER_ACC_WINDOWS_ACCEPT_EULA=true`, you are agreeing to the
+# applicable Microsoft end user license agreement(s) for each deployment or
+# installation for the Microsoft product(s).
+$ make testacc KUBECONFIG=~/.kube/config PACKER_ACC_WINDOWS_ACCEPT_EULA=true
+```
+
+> **Note**: Acceptance tests take a long time to complete (~25 min for Linux, ~45 min for Windows) as they download ISOs and perform full OS installations.
+
+#### Windows ISO URL
+
+The Windows acceptance test imports its installation ISO from a URL. Microsoft
+does not offer a stable public URL: the download links it generates are
+time-limited (valid for roughly 24 hours), so the test ships with a default URL
+that worked at the time of writing and may have since expired.
+
+Override it with the `PACKER_ACC_WINDOWS_ISO_URL` environment variable:
+
+```shell
+$ make testacc KUBECONFIG=~/.kube/config \
+    PACKER_ACC_WINDOWS_ACCEPT_EULA=true \
+    PACKER_ACC_WINDOWS_ISO_URL="https://software.download.prss.microsoft.com/..."
+```
+
+To generate a fresh URL, use the `getisourl.py` helper from the
+[KubeVirt Tekton tasks](https://github.com/kubevirt/kubevirt-tekton-tasks/blob/main/release/pipelines/windows-efi-installer/getisourl.py)
+(requires Python with [Selenium](https://pypi.org/project/selenium/) installed
+and a Chrome or Chromium browser available). Download it so you can review it,
+then run it:
+
+```shell
+$ wget https://raw.githubusercontent.com/kubevirt/kubevirt-tekton-tasks/main/release/pipelines/windows-efi-installer/getisourl.py
+$ export PACKER_ACC_WINDOWS_ISO_URL="$(python3 getisourl.py)"
+```
+
 ## Privacy Notice
 
 Individuals, including external contributors, who participate in this repository and related project activities may have personal information associated with their GitHub profiles, contributions, and repository activity processed for security, compliance, audit, vulnerability management, and related governance purposes.
