@@ -1,3 +1,11 @@
+## 1.0.1 (November 2, 2026)
+
+### **SECURITY:**
+* deps: bump Go to 1.26.10, github.com/hashicorp/packer-plugin-sdk to v0.6.13 and
+  golang.org/x/crypto to v0.58.0, and refresh other dependencies
+  [GH-66](https://github.com/hashicorp/packer-plugin-kubevirt/pull/66)
+* deps: bump github.com/go-jose/go-jose/v4 to v4.1.7
+
 ## 1.0.0 (October 1, 2026)
 
 ### **NOTES:**
@@ -92,4 +100,3 @@ Migrated codebase from [kv-infra/packer-plugin-kubevirt](https://github.com/kv-i
   variable is not, instead it should just show an
   error and ask the user to set this variable.
   [GH-4](https://github.com/hashicorp/packer-plugin-kubevirt/pull/4)
-
