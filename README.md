@@ -75,3 +75,9 @@ $ packer plugins install --path packer-plugin-kubevirt github.com/hashicorp/kube
 ## Usage
 
 Refer to the usage guidance in the [examples](./examples/builder/kubevirt-iso) of this plugin.
+
+## Privacy Notice
+
+Individuals, including external contributors, who participate in this repository and related project activities may have personal information associated with their GitHub profiles, contributions, and repository activity processed for security, compliance, audit, vulnerability management, and related governance purposes.
+
+For more information about how personal information may be collected, used, shared, retained, and the rights available to individuals, please review the [IBM Privacy Statement](https://www.ibm.com/privacy).
