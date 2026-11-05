@@ -53,7 +53,8 @@ The source bootable volume is never modified.
 | :---- | :---- | :---- |
 | `StepPreValidate` | `common` | Checks if the target volumes exist. |
 | `StepValidateVolumeSource` | `clone`  | Checks if the source volume exists and if the user provide disk size  fits the source volume. |
-| `StepCopyMediaFiles` | `common` | Creates a ConfigMap with media files and content, attached as a disk to the VM. Skipped when no media is configured. |
+| `StepCreateCD` | `packer-sdk` | Creates an ISO image locally from `media_files` and `media_content` with the configured `media_label`. Skipped when no media is configured. |
+| `StepUploadMedia` | `clone` | Uploads the ISO created by `StepCreateCD` to the cluster as a DataVolume via the CDI upload proxy. The DataVolume is named `<name>-media`. |
 | `StepCreateVirtualMachine` | `clone`  | Creates a temporary VM with the cloned DV/PVC root disk. Reuses common VM lifecycle helpers shared with the `kubevirt-iso` builder. |
 | `StepStartPortForward` | `common` | Opens a local port forward to the VM for the communicator. |
 | `StepConnect` | `packer-sdk` | Connects the SSH or WinRM communicator through the port forward. |
@@ -156,7 +157,7 @@ build {
 The temporary VM differs from the `kubevirt-iso` VM:
 
 1. **Root disk source**: The `DataVolumeTemplate` uses `Source.PVC` to clone from the source DataVolume's backing PVC, instead of `Source.Blank`.
-2. **Optional media disk**: When `media_files` or `media_content` is configured, a ConfigMap-backed CD-ROM is attached. Otherwise, the VM has only the root disk.
+2. **Optional media disk**: When `media_files` or `media_content` is configured, an ISO is created locally by the Packer SDK's `StepCreateCD`, uploaded to the cluster as a DataVolume via the CDI upload proxy, and attached as a CD-ROM. Otherwise, the VM has only the root disk.
 3. **No ISO disk**: No installation ISO or VirtIO driver disk.
 
 ```go
@@ -195,7 +196,7 @@ Spec: v1.VirtualMachineSpec{
                     Disks:      disks, // rootdisk + optional media CD-ROM
                 },
             },
-            Volumes: volumes, // rootdisk (from DataVolumeTemplate) + optional media ConfigMap
+            Volumes: volumes, // rootdisk (from DataVolumeTemplate) + optional media DataVolume
         },
     },
 },
