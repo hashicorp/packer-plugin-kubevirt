@@ -8,3 +8,4 @@ dist/*
 .docs/*
 docs.zip
 vendor/*
+bin/

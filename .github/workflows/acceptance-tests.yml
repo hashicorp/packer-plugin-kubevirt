@@ -1,0 +1,86 @@
+name: Acceptance Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Cancel superseded runs on the same PR; these jobs can take hours.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  acceptance-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          - name: Fedora
+            run: TestAccISOBuilder_Fedora
+          - name: Ubuntu
+            run: TestAccISOBuilder_Ubuntu
+          - name: Windows
+            run: TestAccISOBuilder_Windows
+    name: ${{ matrix.test.name }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@v7.1.0
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Set up Packer
+        uses: hashicorp/setup-packer@v3.4.0
+
+      - name: Install kind / kubectl
+        uses: helm/kind-action@v1.15.2
+        with:
+          version: v0.33.0
+          install_only: true
+
+      - name: Deploy KubeVirt cluster
+        run: |
+          hack/e2e-setup.sh \
+            -v \
+            --configure-inotify-limits \
+            --create-cluster \
+            --deploy-kubevirt \
+            --deploy-kubevirt-cdi
+          echo "KUBECONFIG=$HOME/.kube/config" >> "$GITHUB_ENV"
+        env:
+          KIND: kind
+          KUBECTL: kubectl
+
+      - name: Run ${{ matrix.test.name }} acceptance test
+        env:
+          TEST_ARGS: -run ${{ matrix.test.run }}
+          # By setting PACKER_ACC_WINDOWS_ACCEPT_EULA to "true", you are agreeing
+          # to the applicable Microsoft end user license agreement(s) for each
+          # deployment or installation for the Microsoft product(s).
+          PACKER_ACC_WINDOWS_ACCEPT_EULA: "true"
+        run: make testacc
+      - name: Upload packer logs
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: packer-logs-${{ matrix.test.name }}
+          path: |
+            builder/**/packer_log_*.txt
+            builder/**/*.pkr.hcl
+          if-no-files-found: ignore
+
+      - name: Cleanup cluster
+        if: always()
+        run: hack/e2e-setup.sh --cleanup
+        env:
+          KIND: kind
+          KUBECTL: kubectl
