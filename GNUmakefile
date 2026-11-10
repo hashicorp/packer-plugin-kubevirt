@@ -37,6 +37,7 @@ generate: install-packer-sdc
 	@awk '/^(- `|<!--)/ { skip = ($$0 ~ /^- `ssh_(bastion|proxy)_/) } !skip' \
 		"$$(go list -m -f '{{.Dir}}' github.com/hashicorp/packer-plugin-sdk)/${SDK_COMMUNICATOR_PARTIALS}/SSH-not-required.mdx" \
 		> docs-partials/builder/kubevirt/iso/SSH-not-required.mdx
+	@cp docs-partials/builder/kubevirt/iso/SSH-not-required.mdx docs-partials/builder/kubevirt/clone/SSH-not-required.mdx
 	@rm -rf .docs
 	@packer-sdc renderdocs -src docs -partials docs-partials/ -dst .docs/
 	@./.web-docs/scripts/compile-to-webdocs.sh "." ".docs" ".web-docs" "hashicorp"
