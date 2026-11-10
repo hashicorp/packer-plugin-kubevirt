@@ -17,6 +17,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/utils/ptr"
 
 	"kubevirt.io/client-go/kubecli"
 	cdiv1 "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
@@ -106,6 +107,49 @@ func waitUntilDataVolumeSucceeded(ctx context.Context, client kubecli.KubevirtCl
 		return false, nil
 	}
 	return wait.PollUntilContextTimeout(ctx, pollInterval, pollTimeout, true, poller)
+}
+
+// EnsureRegistryDataVolume creates a DataVolume that imports a disk image from
+// a container registry (e.g. quay.io/containerdisks/fedora) if it doesn't
+// already exist, and waits for the import to complete.
+func EnsureRegistryDataVolume(ctx context.Context, client kubecli.KubevirtClient, namespace, name, image, size string) error {
+	cdi := client.CdiClient().CdiV1beta1()
+
+	_, err := cdi.DataVolumes(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err == nil {
+		return waitUntilDataVolumeSucceeded(ctx, client, namespace, name)
+	}
+
+	dv := &cdiv1.DataVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Annotations: map[string]string{
+				"cdi.kubevirt.io/storage.bind.immediate.requested": "true",
+			},
+		},
+		Spec: cdiv1.DataVolumeSpec{
+			Source: &cdiv1.DataVolumeSource{
+				Registry: &cdiv1.DataVolumeSourceRegistry{
+					URL: ptr.To("docker://" + image),
+				},
+			},
+			PVC: &corev1.PersistentVolumeClaimSpec{
+				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+				Resources: corev1.VolumeResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceStorage: resource.MustParse(size),
+					},
+				},
+			},
+		},
+	}
+
+	if _, err := cdi.DataVolumes(namespace).Create(ctx, dv, metav1.CreateOptions{}); err != nil {
+		return fmt.Errorf("failed to create registry DataVolume %s/%s: %w", namespace, name, err)
+	}
+
+	return waitUntilDataVolumeSucceeded(ctx, client, namespace, name)
 }
 
 // CleanupBootableVolume deletes the DataSource, DataVolume, PVC, and rootdisk
