@@ -18,9 +18,9 @@ import (
 const (
 	testDiskSize = "6Gi"
 
-	testFedoraNamespace       = "packer-acc-clone-fedora"
+	testFedoraNamespacePrefix = "packer-acc-clone-fedora-"
 	testFedoraSourceDVName    = "fedora-containerdisk"
-	testFedoraSourceImage     = "quay.io/containerdisks/fedora:latest"
+	testFedoraSourceImage     = "quay.io/containerdisks/fedora:45"
 	testFedoraSourceDVSize    = "6Gi"
 	testFedoraCloneName       = "fedora-clone-acc"
 	testFedoraCloneInstance   = "u1.medium"
@@ -28,7 +28,7 @@ const (
 	testFedoraCloneSSHUser    = "fedora"
 	testFedoraCloneSSHPass    = "password"
 
-	testUbuntuNamespace       = "packer-acc-clone-ubuntu"
+	testUbuntuNamespacePrefix = "packer-acc-clone-ubuntu-"
 	testUbuntuSourceDVName    = "ubuntu-containerdisk"
 	testUbuntuSourceImage     = "quay.io/containerdisks/ubuntu:24.04"
 	testUbuntuSourceDVSize    = "6Gi"
@@ -52,6 +52,12 @@ source "kubevirt-clone" "test" {
   disk_size     = "%s"
   instance_type = "%s"
   preference    = "%s"
+
+  networks {
+    name = "default"
+
+    pod {}
+  }
 
   communicator = "ssh"
   ssh_username = "%s"
@@ -157,20 +163,22 @@ func runCloneAccTest(t *testing.T, testName, namespace, template, sourceDVName, 
 }
 
 func TestAccCloneBuilder_Fedora(t *testing.T) {
+	namespace := kubevirttest.RandomNamespace(testFedoraNamespacePrefix)
 	runCloneAccTest(t,
 		"kubevirt_clone_fedora",
-		testFedoraNamespace,
-		testCloneTemplate(testFedoraCloneName, testFedoraNamespace, testFedoraSourceDVName, testDiskSize, testFedoraCloneInstance, testFedoraClonePreference, testFedoraCloneSSHUser, testFedoraCloneSSHPass),
+		namespace,
+		testCloneTemplate(testFedoraCloneName, namespace, testFedoraSourceDVName, testDiskSize, testFedoraCloneInstance, testFedoraClonePreference, testFedoraCloneSSHUser, testFedoraCloneSSHPass),
 		testFedoraSourceDVName, testFedoraSourceImage, testFedoraSourceDVSize,
 		testFedoraCloneName, testFedoraCloneInstance, testFedoraClonePreference,
 	)
 }
 
 func TestAccCloneBuilder_Ubuntu(t *testing.T) {
+	namespace := kubevirttest.RandomNamespace(testUbuntuNamespacePrefix)
 	runCloneAccTest(t,
 		"kubevirt_clone_ubuntu",
-		testUbuntuNamespace,
-		testCloneTemplate(testUbuntuCloneName, testUbuntuNamespace, testUbuntuSourceDVName, testDiskSize, testUbuntuCloneInstance, testUbuntuClonePreference, testUbuntuCloneSSHUser, testUbuntuCloneSSHPass),
+		namespace,
+		testCloneTemplate(testUbuntuCloneName, namespace, testUbuntuSourceDVName, testDiskSize, testUbuntuCloneInstance, testUbuntuClonePreference, testUbuntuCloneSSHUser, testUbuntuCloneSSHPass),
 		testUbuntuSourceDVName, testUbuntuSourceImage, testUbuntuSourceDVSize,
 		testUbuntuCloneName, testUbuntuCloneInstance, testUbuntuClonePreference,
 	)
