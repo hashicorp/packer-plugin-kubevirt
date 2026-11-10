@@ -24,6 +24,7 @@ To get started, see the [Packer installation guide](https://developer.hashicorp.
 ## Components
 
 - `kubevirt-iso` - This builder starts from a ISO file and builds virtual machine image on a KubeVirt cluster.
+- `kubevirt-clone` - This builder clones an existing virtual machine image and customizes it to produce a modified one.
 
 ### Design
 
