@@ -33,3 +33,4 @@ $ packer plugins install github.com/hashicorp/kubevirt
 #### Builders
 
 - [kubevirt-iso](/packer/integrations/hashicorp/kubevirt/latest/components/builder/iso) - This builder starts from a ISO file and builds virtual machine image on a KubeVirt cluster.
+- [kubevirt-clone](/packer/integrations/hashicorp/kubevirt/latest/components/builder/clone) - This builder clones an existing DataVolume and customizes it to produce a new bootable volume.

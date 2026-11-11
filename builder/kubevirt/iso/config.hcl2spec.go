@@ -21,22 +21,15 @@ type FlatConfig struct {
 	KubeConfig                *string           `mapstructure:"kube_config" required:"true" cty:"kube_config" hcl:"kube_config"`
 	Name                      *string           `mapstructure:"name" required:"true" cty:"name" hcl:"name"`
 	Namespace                 *string           `mapstructure:"namespace" required:"true" cty:"namespace" hcl:"namespace"`
-	IsoVolumeName             *string           `mapstructure:"iso_volume_name" required:"true" cty:"iso_volume_name" hcl:"iso_volume_name"`
 	DiskSize                  *string           `mapstructure:"disk_size" required:"true" cty:"disk_size" hcl:"disk_size"`
 	InstanceType              *string           `mapstructure:"instance_type" required:"true" cty:"instance_type" hcl:"instance_type"`
 	InstanceTypeKind          *string           `mapstructure:"instance_type_kind" required:"false" cty:"instance_type_kind" hcl:"instance_type_kind"`
 	Preference                *string           `mapstructure:"preference" required:"true" cty:"preference" hcl:"preference"`
 	PreferenceKind            *string           `mapstructure:"preference_kind" required:"false" cty:"preference_kind" hcl:"preference_kind"`
-	OperatingSystemType       *string           `mapstructure:"os_type" required:"false" cty:"os_type" hcl:"os_type"`
 	DiskBus                   *string           `mapstructure:"disk_bus" required:"false" cty:"disk_bus" hcl:"disk_bus"`
-	Networks                  []FlatNetwork     `mapstructure:"networks" required:"false" cty:"networks" hcl:"networks"`
 	MediaFiles                []string          `mapstructure:"media_files" required:"false" cty:"media_files" hcl:"media_files"`
 	MediaContent              map[string]string `mapstructure:"media_content" required:"false" cty:"media_content" hcl:"media_content"`
 	MediaLabel                *string           `mapstructure:"media_label" required:"false" cty:"media_label" hcl:"media_label"`
-	VirtIOContainerImage      *string           `mapstructure:"virtio_container_image" required:"false" cty:"virtio_container_image" hcl:"virtio_container_image"`
-	BootCommand               []string          `mapstructure:"boot_command" required:"false" cty:"boot_command" hcl:"boot_command"`
-	BootWait                  *string           `mapstructure:"boot_wait" required:"false" cty:"boot_wait" hcl:"boot_wait"`
-	InstallationWaitTimeout   *string           `mapstructure:"installation_wait_timeout" required:"false" cty:"installation_wait_timeout" hcl:"installation_wait_timeout"`
 	StorageClassName          *string           `mapstructure:"storage_class_name" required:"false" cty:"storage_class_name" hcl:"storage_class_name"`
 	AccessMode                *string           `mapstructure:"access_mode" required:"false" cty:"access_mode" hcl:"access_mode"`
 	VolumeMode                *string           `mapstructure:"volume_mode" required:"false" cty:"volume_mode" hcl:"volume_mode"`
@@ -93,11 +86,18 @@ type FlatConfig struct {
 	WinRMUseNTLM              *bool             `mapstructure:"winrm_use_ntlm" cty:"winrm_use_ntlm" hcl:"winrm_use_ntlm"`
 	SSHLocalPort              *int              `mapstructure:"ssh_local_port" required:"false" cty:"ssh_local_port" hcl:"ssh_local_port"`
 	WinRMLocalPort            *int              `mapstructure:"winrm_local_port" required:"false" cty:"winrm_local_port" hcl:"winrm_local_port"`
+	KeepVM                    *bool             `mapstructure:"keep_vm" required:"false" cty:"keep_vm" hcl:"keep_vm"`
+	SkipCreateImage           *bool             `mapstructure:"skip_create_image" required:"false" cty:"skip_create_image" hcl:"skip_create_image"`
+	IsoVolumeName             *string           `mapstructure:"iso_volume_name" required:"true" cty:"iso_volume_name" hcl:"iso_volume_name"`
+	OperatingSystemType       *string           `mapstructure:"os_type" required:"false" cty:"os_type" hcl:"os_type"`
+	Networks                  []FlatNetwork     `mapstructure:"networks" required:"false" cty:"networks" hcl:"networks"`
+	VirtIOContainerImage      *string           `mapstructure:"virtio_container_image" required:"false" cty:"virtio_container_image" hcl:"virtio_container_image"`
+	BootCommand               []string          `mapstructure:"boot_command" required:"false" cty:"boot_command" hcl:"boot_command"`
+	BootWait                  *string           `mapstructure:"boot_wait" required:"false" cty:"boot_wait" hcl:"boot_wait"`
+	InstallationWaitTimeout   *string           `mapstructure:"installation_wait_timeout" required:"false" cty:"installation_wait_timeout" hcl:"installation_wait_timeout"`
 	SSHRemotePort             *int              `mapstructure:"ssh_remote_port" required:"false" undocumented:"true" cty:"ssh_remote_port" hcl:"ssh_remote_port"`
 	WinRMRemotePort           *int              `mapstructure:"winrm_remote_port" required:"false" undocumented:"true" cty:"winrm_remote_port" hcl:"winrm_remote_port"`
 	WinRMWaitTimeout          *string           `mapstructure:"winrm_wait_timeout" required:"false" undocumented:"true" cty:"winrm_wait_timeout" hcl:"winrm_wait_timeout"`
-	KeepVM                    *bool             `mapstructure:"keep_vm" required:"false" cty:"keep_vm" hcl:"keep_vm"`
-	SkipCreateImage           *bool             `mapstructure:"skip_create_image" required:"false" cty:"skip_create_image" hcl:"skip_create_image"`
 }
 
 // FlatMapstructure returns a new FlatConfig.
@@ -123,22 +123,15 @@ func (*FlatConfig) HCL2Spec() map[string]hcldec.Spec {
 		"kube_config":                  &hcldec.AttrSpec{Name: "kube_config", Type: cty.String, Required: false},
 		"name":                         &hcldec.AttrSpec{Name: "name", Type: cty.String, Required: false},
 		"namespace":                    &hcldec.AttrSpec{Name: "namespace", Type: cty.String, Required: false},
-		"iso_volume_name":              &hcldec.AttrSpec{Name: "iso_volume_name", Type: cty.String, Required: false},
 		"disk_size":                    &hcldec.AttrSpec{Name: "disk_size", Type: cty.String, Required: false},
 		"instance_type":                &hcldec.AttrSpec{Name: "instance_type", Type: cty.String, Required: false},
 		"instance_type_kind":           &hcldec.AttrSpec{Name: "instance_type_kind", Type: cty.String, Required: false},
 		"preference":                   &hcldec.AttrSpec{Name: "preference", Type: cty.String, Required: false},
 		"preference_kind":              &hcldec.AttrSpec{Name: "preference_kind", Type: cty.String, Required: false},
-		"os_type":                      &hcldec.AttrSpec{Name: "os_type", Type: cty.String, Required: false},
 		"disk_bus":                     &hcldec.AttrSpec{Name: "disk_bus", Type: cty.String, Required: false},
-		"networks":                     &hcldec.BlockListSpec{TypeName: "networks", Nested: hcldec.ObjectSpec((*FlatNetwork)(nil).HCL2Spec())},
 		"media_files":                  &hcldec.AttrSpec{Name: "media_files", Type: cty.List(cty.String), Required: false},
 		"media_content":                &hcldec.AttrSpec{Name: "media_content", Type: cty.Map(cty.String), Required: false},
 		"media_label":                  &hcldec.AttrSpec{Name: "media_label", Type: cty.String, Required: false},
-		"virtio_container_image":       &hcldec.AttrSpec{Name: "virtio_container_image", Type: cty.String, Required: false},
-		"boot_command":                 &hcldec.AttrSpec{Name: "boot_command", Type: cty.List(cty.String), Required: false},
-		"boot_wait":                    &hcldec.AttrSpec{Name: "boot_wait", Type: cty.String, Required: false},
-		"installation_wait_timeout":    &hcldec.AttrSpec{Name: "installation_wait_timeout", Type: cty.String, Required: false},
 		"storage_class_name":           &hcldec.AttrSpec{Name: "storage_class_name", Type: cty.String, Required: false},
 		"access_mode":                  &hcldec.AttrSpec{Name: "access_mode", Type: cty.String, Required: false},
 		"volume_mode":                  &hcldec.AttrSpec{Name: "volume_mode", Type: cty.String, Required: false},
@@ -195,11 +188,18 @@ func (*FlatConfig) HCL2Spec() map[string]hcldec.Spec {
 		"winrm_use_ntlm":               &hcldec.AttrSpec{Name: "winrm_use_ntlm", Type: cty.Bool, Required: false},
 		"ssh_local_port":               &hcldec.AttrSpec{Name: "ssh_local_port", Type: cty.Number, Required: false},
 		"winrm_local_port":             &hcldec.AttrSpec{Name: "winrm_local_port", Type: cty.Number, Required: false},
+		"keep_vm":                      &hcldec.AttrSpec{Name: "keep_vm", Type: cty.Bool, Required: false},
+		"skip_create_image":            &hcldec.AttrSpec{Name: "skip_create_image", Type: cty.Bool, Required: false},
+		"iso_volume_name":              &hcldec.AttrSpec{Name: "iso_volume_name", Type: cty.String, Required: false},
+		"os_type":                      &hcldec.AttrSpec{Name: "os_type", Type: cty.String, Required: false},
+		"networks":                     &hcldec.BlockListSpec{TypeName: "networks", Nested: hcldec.ObjectSpec((*FlatNetwork)(nil).HCL2Spec())},
+		"virtio_container_image":       &hcldec.AttrSpec{Name: "virtio_container_image", Type: cty.String, Required: false},
+		"boot_command":                 &hcldec.AttrSpec{Name: "boot_command", Type: cty.List(cty.String), Required: false},
+		"boot_wait":                    &hcldec.AttrSpec{Name: "boot_wait", Type: cty.String, Required: false},
+		"installation_wait_timeout":    &hcldec.AttrSpec{Name: "installation_wait_timeout", Type: cty.String, Required: false},
 		"ssh_remote_port":              &hcldec.AttrSpec{Name: "ssh_remote_port", Type: cty.Number, Required: false},
 		"winrm_remote_port":            &hcldec.AttrSpec{Name: "winrm_remote_port", Type: cty.Number, Required: false},
 		"winrm_wait_timeout":           &hcldec.AttrSpec{Name: "winrm_wait_timeout", Type: cty.String, Required: false},
-		"keep_vm":                      &hcldec.AttrSpec{Name: "keep_vm", Type: cty.Bool, Required: false},
-		"skip_create_image":            &hcldec.AttrSpec{Name: "skip_create_image", Type: cty.Bool, Required: false},
 	}
 	return s
 }
@@ -302,58 +302,6 @@ func (*FlatPodNetwork) HCL2Spec() map[string]hcldec.Spec {
 	s := map[string]hcldec.Spec{
 		"vmNetworkCIDR":     &hcldec.AttrSpec{Name: "vmNetworkCIDR", Type: cty.String, Required: false},
 		"vmIPv6NetworkCIDR": &hcldec.AttrSpec{Name: "vmIPv6NetworkCIDR", Type: cty.String, Required: false},
-	}
-	return s
-}
-
-// FlatPortForwardConfig is an auto-generated flat version of PortForwardConfig.
-// Where the contents of a field with a `mapstructure:,squash` tag are bubbled up.
-type FlatPortForwardConfig struct {
-	SSHLocalPort   *int `mapstructure:"ssh_local_port" required:"false" cty:"ssh_local_port" hcl:"ssh_local_port"`
-	WinRMLocalPort *int `mapstructure:"winrm_local_port" required:"false" cty:"winrm_local_port" hcl:"winrm_local_port"`
-}
-
-// FlatMapstructure returns a new FlatPortForwardConfig.
-// FlatPortForwardConfig is an auto-generated flat version of PortForwardConfig.
-// Where the contents a fields with a `mapstructure:,squash` tag are bubbled up.
-func (*PortForwardConfig) FlatMapstructure() interface{ HCL2Spec() map[string]hcldec.Spec } {
-	return new(FlatPortForwardConfig)
-}
-
-// HCL2Spec returns the hcl spec of a PortForwardConfig.
-// This spec is used by HCL to read the fields of PortForwardConfig.
-// The decoded values from this spec will then be applied to a FlatPortForwardConfig.
-func (*FlatPortForwardConfig) HCL2Spec() map[string]hcldec.Spec {
-	s := map[string]hcldec.Spec{
-		"ssh_local_port":   &hcldec.AttrSpec{Name: "ssh_local_port", Type: cty.Number, Required: false},
-		"winrm_local_port": &hcldec.AttrSpec{Name: "winrm_local_port", Type: cty.Number, Required: false},
-	}
-	return s
-}
-
-// FlatStorageConfig is an auto-generated flat version of StorageConfig.
-// Where the contents of a field with a `mapstructure:,squash` tag are bubbled up.
-type FlatStorageConfig struct {
-	StorageClassName *string `mapstructure:"storage_class_name" required:"false" cty:"storage_class_name" hcl:"storage_class_name"`
-	AccessMode       *string `mapstructure:"access_mode" required:"false" cty:"access_mode" hcl:"access_mode"`
-	VolumeMode       *string `mapstructure:"volume_mode" required:"false" cty:"volume_mode" hcl:"volume_mode"`
-}
-
-// FlatMapstructure returns a new FlatStorageConfig.
-// FlatStorageConfig is an auto-generated flat version of StorageConfig.
-// Where the contents a fields with a `mapstructure:,squash` tag are bubbled up.
-func (*StorageConfig) FlatMapstructure() interface{ HCL2Spec() map[string]hcldec.Spec } {
-	return new(FlatStorageConfig)
-}
-
-// HCL2Spec returns the hcl spec of a StorageConfig.
-// This spec is used by HCL to read the fields of StorageConfig.
-// The decoded values from this spec will then be applied to a FlatStorageConfig.
-func (*FlatStorageConfig) HCL2Spec() map[string]hcldec.Spec {
-	s := map[string]hcldec.Spec{
-		"storage_class_name": &hcldec.AttrSpec{Name: "storage_class_name", Type: cty.String, Required: false},
-		"access_mode":        &hcldec.AttrSpec{Name: "access_mode", Type: cty.String, Required: false},
-		"volume_mode":        &hcldec.AttrSpec{Name: "volume_mode", Type: cty.String, Required: false},
 	}
 	return s
 }

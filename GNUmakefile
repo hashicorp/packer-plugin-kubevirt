@@ -25,8 +25,10 @@ install-packer-sdc: ## Install packer sofware development command
 plugin-check: install-packer-sdc build
 	@packer-sdc plugin-check ${BINARY}
 
+KUBECONFIG?=$(shell echo $$KUBECONFIG)
+
 testacc: dev
-	@PACKER_ACC=1 go test -count $(COUNT) -v $(TEST) -timeout=120m
+	@PACKER_ACC=1 KUBECONFIG=$(KUBECONFIG) go test -count $(COUNT) -v $(TEST) -timeout=120m
 
 # The SDK documentation of the SSH communicator is copied without the bastion
 # and proxy options, which cannot reach the port forward of the builder.
@@ -35,6 +37,7 @@ generate: install-packer-sdc
 	@awk '/^(- `|<!--)/ { skip = ($$0 ~ /^- `ssh_(bastion|proxy)_/) } !skip' \
 		"$$(go list -m -f '{{.Dir}}' github.com/hashicorp/packer-plugin-sdk)/${SDK_COMMUNICATOR_PARTIALS}/SSH-not-required.mdx" \
 		> docs-partials/builder/kubevirt/iso/SSH-not-required.mdx
+	@cp docs-partials/builder/kubevirt/iso/SSH-not-required.mdx docs-partials/builder/kubevirt/clone/SSH-not-required.mdx
 	@rm -rf .docs
 	@packer-sdc renderdocs -src docs -partials docs-partials/ -dst .docs/
 	@./.web-docs/scripts/compile-to-webdocs.sh "." ".docs" ".web-docs" "hashicorp"

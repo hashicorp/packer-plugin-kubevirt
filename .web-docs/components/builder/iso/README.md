@@ -37,7 +37,7 @@ build {
 
 ### Required Configuration
 
-<!-- Code generated from the comments of the Config struct in builder/kubevirt/iso/config.go; DO NOT EDIT MANUALLY -->
+<!-- Code generated from the comments of the BuilderConfig struct in builder/kubevirt/common/config.go; DO NOT EDIT MANUALLY -->
 
 - `kube_config` (string) - KubeConfig is the path to the kubeconfig file used to connect to the cluster.
   A leading `~` is expanded to the home directory of the current user.
@@ -47,9 +47,6 @@ build {
   DataVolume, DataSource or PersistentVolumeClaim with this name already exists.
 
 - `namespace` (string) - Namespace is the namespace in which to create the VM image.
-
-- `iso_volume_name` (string) - ISO Volume Name is the name of the DataVolume resource that contains the installation ISO.
-  This DataVolume must already exist in the namespace.
 
 - `disk_size` (string) - DiskSize is the size of the root disk of the temporary VM, as a Kubernetes
   quantity, e.g. "10Gi".
@@ -62,12 +59,20 @@ build {
   It is also recorded on the resulting DataSource as its default preference,
   which VMs created from it can infer.
 
+<!-- End of code generated from the comments of the BuilderConfig struct in builder/kubevirt/common/config.go; -->
+
+
+<!-- Code generated from the comments of the Config struct in builder/kubevirt/iso/config.go; DO NOT EDIT MANUALLY -->
+
+- `iso_volume_name` (string) - ISO Volume Name is the name of the DataVolume resource that contains the installation ISO.
+  This DataVolume must already exist in the namespace.
+
 <!-- End of code generated from the comments of the Config struct in builder/kubevirt/iso/config.go; -->
 
 
 ### Not Required Configuration
 
-<!-- Code generated from the comments of the Config struct in builder/kubevirt/iso/config.go; DO NOT EDIT MANUALLY -->
+<!-- Code generated from the comments of the BuilderConfig struct in builder/kubevirt/common/config.go; DO NOT EDIT MANUALLY -->
 
 - `instance_type_kind` (string) - InstanceTypeKind is the kind of the InstanceType resource to use in the temporary VM.
   Supported values are "virtualmachineclusterinstancetype" and "virtualmachineinstancetype".
@@ -77,25 +82,19 @@ build {
   Supported values are "virtualmachineclusterpreference" and "virtualmachinepreference".
   Defaults to "virtualmachineclusterpreference".
 
-- `os_type` (string) - OperatingSystemType is the type of operating system to install.
-  Supported values are "linux" and "windows". Default is "linux".
-
 - `disk_bus` (string) - DiskBus is the bus type to use for CD-ROM disk devices on the temporary VM.
   Supported values are "scsi", "sata", and "usb". KubeVirt does not support
   "virtio" for CD-ROM devices.
   Defaults to "scsi", which is compatible with both x86 and arm64 architectures.
   Use "sata" on x86 clusters if required by your storage configuration.
 
-- `networks` ([]Network) - Networks is a list of networks to attach to the temporary VM.
-  If no networks are specified, a single pod network will be used.
-
-- `media_files` ([]string) - MediaFiles is a path list of files to be copied and used during the ISO installation.
+- `media_files` ([]string) - MediaFiles is a path list of files to be copied and used during the build.
   The files are stored in a ConfigMap and attached to the VM as a disk, where each
   file is named after its base name. The file names must therefore be unique, and
   the files must add up to at most 1 MiB.
 
 - `media_content` (map[string]string) - MediaContent is a map of file names to file contents to add to the media disk,
-  alongside `media_files`. This is useful to render installer configuration from
+  alongside `media_files`. This is useful to render configuration from
   the template, for example with the `templatefile` function:
   
   ```hcl
@@ -113,6 +112,24 @@ build {
   "OEMDRV" for Anaconda kickstart (RHEL, Fedora) or "cidata" for cloud-init
   NoCloud / Subiquity autoinstall (Ubuntu). Only applies when `os_type` is "linux".
   Must be at most 32 characters long. Defaults to "OEMDRV".
+
+- `keep_vm` (bool) - KeepVM indicates whether to keep the temporary VM after the image has been created.
+  Default is false.
+
+- `skip_create_image` (bool) - SkipCreateImage when set to true skips creating the final bootable volume
+  DataSource and does not register the artifact with HCP Packer.
+  Default is false.
+
+<!-- End of code generated from the comments of the BuilderConfig struct in builder/kubevirt/common/config.go; -->
+
+
+<!-- Code generated from the comments of the Config struct in builder/kubevirt/iso/config.go; DO NOT EDIT MANUALLY -->
+
+- `os_type` (string) - OperatingSystemType is the type of operating system to install.
+  Supported values are "linux" and "windows". Default is "linux".
+
+- `networks` ([]Network) - Networks is a list of networks to attach to the temporary VM.
+  If no networks are specified, a single pod network will be used.
 
 - `virtio_container_image` (string) - VirtIOContainerImage is the container disk image with the VirtIO drivers,
   attached as a CD-ROM to Windows VMs so that the installer can use VirtIO
@@ -132,34 +149,20 @@ build {
   to know when the installation has finished. With a communicator, the builder connects
   to the VM once this time has elapsed.
 
-- `keep_vm` (bool) - KeepVM indicates whether to keep the temporary VM after the image has been created.
-  If false, the VM and all its resources will be deleted after the image is created.
-  If true, only the VM resource will be kept, all other resources will be deleted.
-  Default is false.
-  
-  This can be useful for debugging purposes, to inspect the VM and its disks.
-  However, it is recommended to set this to false in production environments to avoid
-  resource leaks.
-
-- `skip_create_image` (bool) - SkipCreateImage when set to true skips creating the final bootable volume
-  DataSource and does not register the artifact with HCP Packer. This is
-  useful for iterative debugging when you do not want to produce a final image.
-  Default is false.
-
 <!-- End of code generated from the comments of the Config struct in builder/kubevirt/iso/config.go; -->
 
 
 ### Storage Configuration
 
-<!-- Code generated from the comments of the StorageConfig struct in builder/kubevirt/iso/config.go; DO NOT EDIT MANUALLY -->
+<!-- Code generated from the comments of the StorageConfig struct in builder/kubevirt/common/config.go; DO NOT EDIT MANUALLY -->
 
 The following options configure the persistent volumes created by the builder:
 the root disk of the temporary VM and the bootable volume cloned from it.
 
-<!-- End of code generated from the comments of the StorageConfig struct in builder/kubevirt/iso/config.go; -->
+<!-- End of code generated from the comments of the StorageConfig struct in builder/kubevirt/common/config.go; -->
 
 
-<!-- Code generated from the comments of the StorageConfig struct in builder/kubevirt/iso/config.go; DO NOT EDIT MANUALLY -->
+<!-- Code generated from the comments of the StorageConfig struct in builder/kubevirt/common/config.go; DO NOT EDIT MANUALLY -->
 
 - `storage_class_name` (string) - StorageClassName is the name of the StorageClass of the volumes.
   Defaults to the default StorageClass of the cluster.
@@ -170,7 +173,7 @@ the root disk of the temporary VM and the bootable volume cloned from it.
 - `volume_mode` (string) - VolumeMode is the volume mode of the volumes.
   Supported values are "Filesystem" and "Block". Defaults to "Filesystem".
 
-<!-- End of code generated from the comments of the StorageConfig struct in builder/kubevirt/iso/config.go; -->
+<!-- End of code generated from the comments of the StorageConfig struct in builder/kubevirt/common/config.go; -->
 
 
 ### Network Configuration
@@ -253,16 +256,16 @@ The `ssh_bastion_*` and `ssh_proxy_*` options are not supported: the
 communicator connects to a port forward on the machine running Packer, which a
 bastion host or a proxy cannot reach.
 
-<!-- Code generated from the comments of the PortForwardConfig struct in builder/kubevirt/iso/config.go; DO NOT EDIT MANUALLY -->
+<!-- Code generated from the comments of the PortForwardConfig struct in builder/kubevirt/common/config.go; DO NOT EDIT MANUALLY -->
 
 The communicator reaches the VM through a port forward opened with the
 KubeVirt API, which listens on `ssh_host` or `winrm_host` (defaults to
 `127.0.0.1`) and forwards connections to `ssh_port` or `winrm_port` in the VM.
 
-<!-- End of code generated from the comments of the PortForwardConfig struct in builder/kubevirt/iso/config.go; -->
+<!-- End of code generated from the comments of the PortForwardConfig struct in builder/kubevirt/common/config.go; -->
 
 
-<!-- Code generated from the comments of the PortForwardConfig struct in builder/kubevirt/iso/config.go; DO NOT EDIT MANUALLY -->
+<!-- Code generated from the comments of the PortForwardConfig struct in builder/kubevirt/common/config.go; DO NOT EDIT MANUALLY -->
 
 - `ssh_local_port` (int) - SSHLocalPort is the local port the port forward to the VM listens on
   when using the SSH communicator. Defaults to a free port allocated by
@@ -272,7 +275,7 @@ KubeVirt API, which listens on `ssh_host` or `winrm_host` (defaults to
   when using the WinRM communicator. Defaults to a free port allocated by
   the operating system, so that concurrent builds do not conflict.
 
-<!-- End of code generated from the comments of the PortForwardConfig struct in builder/kubevirt/iso/config.go; -->
+<!-- End of code generated from the comments of the PortForwardConfig struct in builder/kubevirt/common/config.go; -->
 
 
 #### Optional common fields:

@@ -1,0 +1,132 @@
+---
+modeline: |
+  vim: set ft=pandoc:
+description: |
+  The KubeVirt Clone builder creates a customized bootable volume by cloning
+  an existing DataVolume and producing a new one.
+page_title: KubeVirt Clone - Builders
+nav_title: Clone
+---
+
+# KubeVirt Builder (from a Clone)
+
+Type: `kubevirt-clone`
+Artifact BuilderId: `packer.kubevirt.clone`
+
+The KubeVirt Clone builder creates a customized bootable volume inside a
+Kubernetes cluster by cloning an existing DataVolume, modifying it and producing
+a new DataVolume and DataSource. It supports both Linux and Windows guests, with
+provisioning through SSH or WinRM.
+
+This builder complements other workflows customizing pre-existing images —
+the typical day-2 golden image pipeline.
+
+---
+
+## Basic Example
+
+Here is a basic example showing how to clone a Fedora base image and customize it:
+
+```hcl
+source "kubevirt-clone" "fedora" {
+  kube_config = "~/.kube/config"
+  name        = "fedora-customized"
+  namespace   = "vm-images"
+
+  source_volume_name = "fedora-base"
+
+  disk_size     = "10Gi"
+  instance_type = "u1.medium"
+  preference    = "fedora"
+
+  communicator = "ssh"
+  ssh_username = "fedora"
+  ssh_password = "password"
+  ssh_timeout  = "10m"
+
+  media_content = {
+    "user-data" = <<-EOF
+      #cloud-config
+      chpasswd:
+        expire: false
+      password: password
+      user: fedora
+      ssh_pwauth: true
+    EOF
+    "meta-data" = <<-EOF
+      instance-id: fedora-customized
+      local-hostname: fedora-customized
+    EOF
+  }
+  media_label = "cidata"
+}
+
+build {
+  sources = ["source.kubevirt-clone.fedora"]
+
+  provisioner "shell" {
+    inline = ["echo 'Customization complete'"]
+  }
+}
+```
+
+## KubeVirt-Clone Builder Configuration Reference
+
+### Required Configuration
+
+@include 'builder/kubevirt/common/BuilderConfig-required.mdx'
+@include 'builder/kubevirt/clone/Config-required.mdx'
+
+### Not Required Configuration
+
+@include 'builder/kubevirt/common/BuilderConfig-not-required.mdx'
+@include 'builder/kubevirt/clone/Config-not-required.mdx'
+
+### Storage Configuration
+
+@include 'builder/kubevirt/common/StorageConfig.mdx'
+
+@include 'builder/kubevirt/common/StorageConfig-not-required.mdx'
+
+### Network Configuration
+
+@include 'builder/kubevirt/clone/Network.mdx'
+@include 'builder/kubevirt/clone/Network-not-required.mdx'
+
+@include 'builder/kubevirt/clone/NetworkSource.mdx'
+@include 'builder/kubevirt/clone/NetworkSource-not-required.mdx'
+
+@include 'builder/kubevirt/clone/PodNetwork.mdx'
+@include 'builder/kubevirt/clone/PodNetwork-not-required.mdx'
+
+@include 'builder/kubevirt/clone/MultusNetwork.mdx'
+@include 'builder/kubevirt/clone/MultusNetwork-not-required.mdx'
+
+### Communicator Configuration
+
+The builder defaults to `ssh`. Set it to `winrm` for Windows guests or `none`
+to skip provisioning.
+
+The `ssh_bastion_*` and `ssh_proxy_*` options are not supported: the
+communicator connects to a port forward on the machine running Packer, which a
+bastion host or a proxy cannot reach.
+
+@include 'builder/kubevirt/common/PortForwardConfig.mdx'
+
+@include 'builder/kubevirt/common/PortForwardConfig-not-required.mdx'
+
+#### Optional common fields:
+
+@include 'packer-plugin-sdk/communicator/Config-not-required.mdx'
+
+#### Optional SSH fields:
+
+@include 'builder/kubevirt/clone/SSH-not-required.mdx'
+
+@include 'packer-plugin-sdk/communicator/SSH-Private-Key-File-not-required.mdx'
+
+@include 'packer-plugin-sdk/communicator/SSH-Agent-Auth-not-required.mdx'
+
+#### Optional WinRM fields:
+
+@include 'packer-plugin-sdk/communicator/WinRM-not-required.mdx'
