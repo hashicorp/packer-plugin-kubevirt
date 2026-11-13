@@ -240,16 +240,29 @@ var _ = Describe("Config", func() {
 			_, err := c.Prepare(validRawConfig(map[string]interface{}{"installation_wait_timeout": "-5m"}))
 			Expect(err).To(MatchError(ContainSubstring("installation_wait_timeout must not be negative")))
 		})
+
+		It("warns when set with a communicator", func() {
+			c := &iso.Config{}
+			warnings, err := c.Prepare(validRawConfig(map[string]interface{}{
+				"communicator": "ssh",
+				"ssh_username": "fedora",
+			}))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(warnings).To(ConsistOf("installation_wait_timeout is ignored when a communicator is configured; " +
+				"increase ssh_timeout or winrm_timeout to cover the full installation time"))
+		})
 	})
 
 	Context("Prepare communicator", func() {
 		It("uses the SDK defaults for SSH", func() {
 			c := &iso.Config{}
-			warnings, err := c.Prepare(validRawConfig(map[string]interface{}{
+			raw := validRawConfig(map[string]interface{}{
 				"communicator": "ssh",
 				"ssh_username": "fedora",
 				"ssh_password": "fedora",
-			}))
+			})
+			delete(raw, "installation_wait_timeout")
+			warnings, err := c.Prepare(raw)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(warnings).To(BeEmpty())
 			Expect(c.Comm.SSHPort).To(Equal(22))
@@ -315,12 +328,14 @@ var _ = Describe("Config", func() {
 
 		It("maps the deprecated SSH options and warns about them", func() {
 			c := &iso.Config{}
-			warnings, err := c.Prepare(validRawConfig(map[string]interface{}{
+			raw := validRawConfig(map[string]interface{}{
 				"communicator":     "ssh",
 				"ssh_username":     "fedora",
 				"ssh_remote_port":  2222,
 				"ssh_wait_timeout": "20m",
-			}))
+			})
+			delete(raw, "installation_wait_timeout")
+			warnings, err := c.Prepare(raw)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(warnings).To(ConsistOf(
 				"ssh_remote_port is deprecated, use ssh_port instead",
@@ -334,12 +349,14 @@ var _ = Describe("Config", func() {
 
 		It("maps the deprecated WinRM options and warns about them", func() {
 			c := &iso.Config{}
-			warnings, err := c.Prepare(validRawConfig(map[string]interface{}{
+			raw := validRawConfig(map[string]interface{}{
 				"communicator":       "winrm",
 				"winrm_username":     "Administrator",
 				"winrm_remote_port":  5986,
 				"winrm_wait_timeout": "25m",
-			}))
+			})
+			delete(raw, "installation_wait_timeout")
+			warnings, err := c.Prepare(raw)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(warnings).To(ConsistOf(
 				"winrm_remote_port is deprecated, use winrm_port instead",
