@@ -170,6 +170,75 @@ var _ = Describe("StepCreateBootableVolume", func() {
 			Expect(created.Spec.PVC.VolumeMode).To(HaveValue(Equal(corev1.PersistentVolumeBlock)))
 		})
 
+		Context("with labels", func() {
+			var (
+				createdDV *cdiv1beta1.DataVolume
+				createdDS *cdiv1beta1.DataSource
+			)
+
+			BeforeEach(func() {
+				createdDV, createdDS = nil, nil
+				cdiClient.PrependReactor("create", "datavolumes", func(action testing.Action) (bool, runtime.Object, error) {
+					createdDV = action.(testing.CreateAction).GetObject().(*cdiv1beta1.DataVolume)
+					createdDV.Status.Phase = cdiv1beta1.Succeeded
+					return false, createdDV, nil
+				})
+				cdiClient.PrependReactor("create", "datasources", func(action testing.Action) (bool, runtime.Object, error) {
+					createdDS = action.(testing.CreateAction).GetObject().(*cdiv1beta1.DataSource)
+					return false, createdDS, nil
+				})
+			})
+
+			DescribeTable("applies labels to the DataVolume and DataSource",
+				func(labels map[string]string, instanceTypeKind, preferenceKind string, expectedDVLabels, expectedDSLabels map[string]string) {
+					step.Config.Labels = labels
+					step.Config.InstanceTypeKind = instanceTypeKind
+					step.Config.PreferenceKind = preferenceKind
+
+					Expect(step.Run(context.Background(), state)).To(Equal(multistep.ActionContinue))
+
+					if expectedDVLabels == nil {
+						Expect(createdDV.Labels).To(BeEmpty())
+					} else {
+						Expect(createdDV.Labels).To(Equal(expectedDVLabels))
+					}
+					Expect(createdDV.Annotations).To(HaveKeyWithValue("cdi.kubevirt.io/storage.bind.immediate.requested", "true"))
+					Expect(createdDS.Labels).To(Equal(expectedDSLabels))
+				},
+				Entry("applies the labels to the DataVolume and the DataSource",
+					map[string]string{"team": "infra", "example.com/os": "fedora"},
+					"", "",
+					map[string]string{"team": "infra", "example.com/os": "fedora"},
+					map[string]string{
+						"team":           "infra",
+						"example.com/os": "fedora",
+						"instancetype.kubevirt.io/default-instancetype": "cx1.large",
+						"instancetype.kubevirt.io/default-preference":   "fedora",
+					},
+				),
+				Entry("keeps the historical metadata when no labels are set",
+					nil, "", "",
+					nil,
+					map[string]string{
+						"instancetype.kubevirt.io/default-instancetype": "cx1.large",
+						"instancetype.kubevirt.io/default-preference":   "fedora",
+					},
+				),
+				Entry("combines the labels with the namespaced kind labels on the DataSource",
+					map[string]string{"team": "infra"},
+					"virtualmachineinstancetype", "virtualmachinepreference",
+					map[string]string{"team": "infra"},
+					map[string]string{
+						"team": "infra",
+						"instancetype.kubevirt.io/default-instancetype":      "cx1.large",
+						"instancetype.kubevirt.io/default-instancetype-kind": "virtualmachineinstancetype",
+						"instancetype.kubevirt.io/default-preference":        "fedora",
+						"instancetype.kubevirt.io/default-preference-kind":   "virtualmachinepreference",
+					},
+				),
+			)
+		})
+
 		It("halts when DataVolume creation fails", func() {
 			cdiClient.PrependReactor("create", "datavolumes", func(action testing.Action) (bool, runtime.Object, error) {
 				return true, nil, fmt.Errorf("boom: DV create failed")

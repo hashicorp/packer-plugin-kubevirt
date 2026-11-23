@@ -123,6 +123,57 @@ var _ = Describe("Common config", func() {
 		})
 	})
 
+	Context("Prepare labels", func() {
+		DescribeTable("accepts valid labels and keeps them as is",
+			func(labels map[string]string, skipCreateImage bool) {
+				c := validBuilderConfig(func(c *common.BuilderConfig) {
+					c.SkipCreateImage = skipCreateImage
+					c.Labels = labels
+				})
+				Expect(validate(&c)).To(BeEmpty())
+				Expect(c.Labels).To(Equal(labels))
+			},
+			Entry("no labels", nil, false),
+			Entry("empty map", map[string]string{}, false),
+			Entry("simple key", map[string]string{"team": "infra"}, false),
+			Entry("prefixed key", map[string]string{"example.com/os": "fedora"}, false),
+			Entry("well-known key", map[string]string{"app.kubernetes.io/part-of": "golden-images"}, false),
+			Entry("empty value", map[string]string{"empty": ""}, false),
+			Entry("value with dots, dashes and underscores", map[string]string{"version": "v1.2_3-rc"}, false),
+			Entry("63-character name and value", map[string]string{strings.Repeat("k", 63): strings.Repeat("v", 63)}, false),
+			Entry("several labels", map[string]string{"team": "infra", "example.com/os": "fedora", "tier": "gold"}, false),
+			Entry("other instancetype.kubevirt.io keys", map[string]string{"instancetype.kubevirt.io/custom": "yes"}, false),
+			Entry("when no image is created", map[string]string{"team": "infra"}, true),
+		)
+
+		DescribeTable("rejects invalid labels",
+			func(labels map[string]string, msg string, skipCreateImage bool) {
+				c := validBuilderConfig(func(c *common.BuilderConfig) {
+					c.SkipCreateImage = skipCreateImage
+					c.Labels = labels
+				})
+				Expect(validate(&c)).To(ContainElement(MatchError(ContainSubstring(msg))))
+			},
+			Entry("invalid key", map[string]string{"bad key": "v"}, `labels: key "bad key" is invalid`, false),
+			Entry("empty key", map[string]string{"": "v"}, `labels: key "" is invalid`, false),
+			Entry("invalid value", map[string]string{"team": "has space"}, `labels: value "has space" of "team" is invalid`, false),
+			Entry("too long value", map[string]string{"team": strings.Repeat("a", 64)}, `labels: value`, false),
+			Entry("reserved instance type", map[string]string{"instancetype.kubevirt.io/default-instancetype": "u1.small"}, "set by the builder", false),
+			Entry("reserved preference kind", map[string]string{"instancetype.kubevirt.io/default-preference-kind": "virtualmachinepreference"}, "set by the builder", false),
+			Entry("when no image is created", map[string]string{"bad key": "v"}, `labels: key "bad key" is invalid`, true),
+		)
+
+		It("reports every invalid label in key order", func() {
+			c := validBuilderConfig(func(c *common.BuilderConfig) {
+				c.Labels = map[string]string{"z key": "v", "a key": "v"}
+			})
+			errs := validate(&c)
+			Expect(errs).To(HaveLen(2))
+			Expect(errs[0]).To(MatchError(ContainSubstring(`"a key"`)))
+			Expect(errs[1]).To(MatchError(ContainSubstring(`"z key"`)))
+		})
+	})
+
 	Context("Prepare kube_config", func() {
 		It("is required", func() {
 			c := validBuilderConfig(func(c *common.BuilderConfig) { c.KubeConfig = "" })

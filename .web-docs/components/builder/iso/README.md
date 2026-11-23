@@ -113,6 +113,20 @@ build {
   NoCloud / Subiquity autoinstall (Ubuntu). Only applies to Linux operating systems.
   Must be at most 32 characters long. Defaults to "OEMDRV".
 
+- `labels` (map[string]string) - Labels are Kubernetes labels applied to the image the builder produces: the
+  bootable DataVolume and the DataSource. They are not applied to the
+  temporary resources. Keys and values must be valid Kubernetes labels.
+  The instance type and preference labels of the DataSource are set from
+  `instance_type`, `instance_type_kind`, `preference` and `preference_kind`,
+  and cannot be set here.
+  
+  ```hcl
+  labels = {
+    "app.kubernetes.io/part-of" = "packer"
+    label                       = "example"
+  }
+  ```
+
 - `keep_vm` (bool) - KeepVM indicates whether to keep the temporary VM after the image has been created.
   Default is false.
 
