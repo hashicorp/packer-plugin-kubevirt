@@ -32,6 +32,11 @@ source "kubevirt-iso" "fedora" {
   preference_kind    = "virtualmachineclusterpreference" # or "virtualmachinepreference"
   os_type            = "linux"
 
+  # Labels of the resulting DataVolume and DataSource
+  labels = {
+    "app.kubernetes.io/part-of" = "packer-images"
+  }
+
   # Default network configuration
   networks {
     name = "default"

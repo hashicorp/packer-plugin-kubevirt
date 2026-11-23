@@ -40,6 +40,19 @@ func CheckDataVolume(client kubecli.KubevirtClient, namespace, name string) erro
 	return nil
 }
 
+func CheckDataVolumeLabels(client kubecli.KubevirtClient, namespace, name string, labels map[string]string) error {
+	dataVolume, err := client.CdiClient().CdiV1beta1().DataVolumes(namespace).Get(context.Background(), name, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get DataVolume %s/%s: %w", namespace, name, err)
+	}
+	for key, value := range labels {
+		if dataVolume.Labels[key] != value {
+			return fmt.Errorf("expected DataVolume %s/%s label %s to be %s, got %s", namespace, name, key, value, dataVolume.Labels[key])
+		}
+	}
+	return nil
+}
+
 func CheckDataSourceLabels(client kubecli.KubevirtClient, namespace, name string, labels map[string]string) error {
 	dataSource, err := client.CdiClient().CdiV1beta1().DataSources(namespace).Get(context.Background(), name, metav1.GetOptions{})
 	if err != nil {

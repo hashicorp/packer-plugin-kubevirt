@@ -53,6 +53,10 @@ source "kubevirt-clone" "test" {
   instance_type = "%s"
   preference    = "%s"
 
+  labels = {
+    "packer.io/acceptance-test" = "true"
+  }
+
   networks {
     name = "default"
 
@@ -144,9 +148,15 @@ func runCloneAccTest(t *testing.T, testName, namespace, template, sourceDVName, 
 			if err := kubevirttest.CheckDataVolume(client, namespace, cloneName); err != nil {
 				return err
 			}
+			if err := kubevirttest.CheckDataVolumeLabels(client, namespace, cloneName, map[string]string{
+				"packer.io/acceptance-test": "true",
+			}); err != nil {
+				return err
+			}
 			if err := kubevirttest.CheckDataSourceLabels(client, namespace, cloneName, map[string]string{
 				"instancetype.kubevirt.io/default-instancetype": instanceType,
 				"instancetype.kubevirt.io/default-preference":   preference,
+				"packer.io/acceptance-test":                     "true",
 			}); err != nil {
 				return err
 			}
