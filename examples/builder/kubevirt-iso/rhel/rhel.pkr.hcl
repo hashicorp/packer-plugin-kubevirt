@@ -45,15 +45,14 @@ source "kubevirt-iso" "rhel" {
     " inst.ks=hd:LABEL=OEMDRV:/ks.cfg", # Set kickstart file location
     "<leftCtrlOn>x<leftCtrlOff>"        # Boot with modified command line
   ]
-  boot_wait                 = "10s"     # Time to wait after boot starts
-  installation_wait_timeout = "15m"     # Timeout for installation to complete
+  boot_wait = "10s"     # Time to wait after boot starts
 
   # SSH configuration
   # The builder connects through a port forward on 127.0.0.1 and a free local port.
   communicator = "ssh"
   ssh_username = "user"
   ssh_password = "root"
-  ssh_timeout  = "20m"
+  ssh_timeout  = "30m"
 }
 
 build {

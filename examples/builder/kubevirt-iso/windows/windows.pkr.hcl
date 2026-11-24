@@ -54,15 +54,14 @@ source "kubevirt-iso" "windows" {
   boot_command = [
     "<spacebar><wait>",                # Bypass press any key press challenge
   ]
-  boot_wait                 = "5s"     # Time to wait after boot starts
-  installation_wait_timeout = "20m"    # Timeout for installation to complete
+  boot_wait = "5s"     # Time to wait after boot starts
 
   # WinRM configuration
   # The builder connects through a port forward on 127.0.0.1 and a free local port.
   communicator   = "winrm"
   winrm_username = "Administrator"
   winrm_password = "shadowman"
-  winrm_timeout  = "25m"
+  winrm_timeout  = "40m"
 }
 
 build {

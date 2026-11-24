@@ -49,15 +49,14 @@ source "kubevirt-iso" "ubuntu" {
     "initrd /casper/initrd<enter>",
     "boot<enter>"
   ]
-  boot_wait                 = "10s" # Time to wait after boot starts
-  installation_wait_timeout = "15m" # Timeout for installation to complete
+  boot_wait = "10s" # Time to wait after boot starts
 
   # SSH configuration
   # The builder connects through a port forward on 127.0.0.1 and a free local port.
   communicator = "ssh"
   ssh_username = "ubuntu"
   ssh_password = "ubuntu"
-  ssh_timeout  = "20m"
+  ssh_timeout  = "30m"
 }
 
 build {

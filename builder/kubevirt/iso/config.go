@@ -198,10 +198,16 @@ type Config struct {
 	// BootWait is the amount of time to wait before sending the boot command.
 	// This is useful if the VM takes some time to boot and be ready to accept keystrokes.
 	BootWait time.Duration `mapstructure:"boot_wait" required:"false"`
-	// InstallationWaitTimeout is the amount of time to wait for the installation to be completed.
-	// It is required when no communicator is configured, since the builder has no other way
-	// to know when the installation has finished. With a communicator, the builder connects
-	// to the VM once this time has elapsed.
+	// InstallationWaitTimeout is the maximum time to wait for the installation to complete.
+	// Required when no communicator is configured.
+	//
+	// Without a communicator, the builder polls the QEMU guest agent status as a
+	// completion signal. If the guest agent connects within this timeout, the build
+	// proceeds immediately. If it does not (e.g. because the guest agent is not installed),
+	// the build continues after the timeout with a warning that the image may be incomplete.
+	//
+	// When a communicator is configured, this field is ignored: the
+	// communicator's own retry loop detects when the OS is ready.
 	InstallationWaitTimeout time.Duration `mapstructure:"installation_wait_timeout" required:"false"`
 
 	StorageConfig `mapstructure:",squash"`
@@ -390,6 +396,9 @@ func (c *Config) Prepare(raws ...interface{}) ([]string, error) {
 		errs = packersdk.MultiErrorAppend(errs, errors.New("installation_wait_timeout must not be negative"))
 	case c.InstallationWaitTimeout == 0 && c.Comm.Type == "none":
 		errs = packersdk.MultiErrorAppend(errs, errors.New("installation_wait_timeout must be set when no communicator is configured"))
+	case c.InstallationWaitTimeout > 0 && c.Comm.Type != "none":
+		warnings = append(warnings, "installation_wait_timeout is ignored when a communicator is configured; "+
+			"increase ssh_timeout or winrm_timeout to cover the full installation time")
 	}
 
 	networkNames := make(map[string]bool, len(c.Networks))

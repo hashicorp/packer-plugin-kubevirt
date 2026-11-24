@@ -45,7 +45,7 @@ func WaitUntilDataVolumeSucceeded(ctx context.Context, client kubecli.KubevirtCl
 			return false, err
 		}
 
-		if dataVolume != nil && dataVolume.Status.Phase == v1beta1.DataVolumePhase(v1beta1.Succeeded) {
+		if dataVolume != nil && dataVolume.Status.Phase == v1beta1.Succeeded {
 			return true, nil
 		}
 		return false, nil
