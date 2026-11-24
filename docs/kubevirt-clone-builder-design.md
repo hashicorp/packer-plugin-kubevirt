@@ -86,7 +86,7 @@ These are embedded via `mapstructure:",squash"` and documented in a common packa
 ### Clone-specific fields
 
 - `source_volume_name` (string, **required**) — Name of the source DataVolume. This is the bootable volume to clone.
-- `source_volume_namespace` (string, optional) — Namespace of the source DataVolume. Defaults to `default`.
+- `source_volume_namespace` (string, optional) — Namespace of the source DataVolume. Defaults to `namespace` field value.
 
 The value of these fields can't be equal to `name` and `namespace` values.
 
@@ -122,6 +122,7 @@ source "kubevirt-clone" "customized-fedora" {
 
   # Source: bootable volume 
   source_volume_name = "fedora-42-base"
+  # source_volume_namespace is not provided, defaults to "images" namespace
 
   # VM configuration
   instance_type = "o1.medium"
