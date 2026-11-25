@@ -5,20 +5,18 @@ package iso
 
 import (
 	"context"
-	"errors"
-	"fmt"
 
 	"github.com/hashicorp/hcl/v2/hcldec"
-	"github.com/hashicorp/packer-plugin-sdk/communicator"
+	kubevirtcommon "github.com/hashicorp/packer-plugin-kubevirt/builder/kubevirt/common"
 	"github.com/hashicorp/packer-plugin-sdk/multistep"
 	"github.com/hashicorp/packer-plugin-sdk/multistep/commonsteps"
 	"github.com/hashicorp/packer-plugin-sdk/packer"
 	"github.com/hashicorp/packer-plugin-sdk/packerbuilderdata"
 
-	"k8s.io/client-go/tools/clientcmd"
-
 	"kubevirt.io/client-go/kubecli"
 )
+
+const BuilderID = "packer.kubevirt.iso"
 
 type Builder struct {
 	config Config
@@ -36,16 +34,9 @@ func (b *Builder) Prepare(raws ...interface{}) ([]string, []string, error) {
 		return nil, warnings, errs
 	}
 
-	restConfig, err := clientcmd.BuildConfigFromFlags("", b.config.KubeConfig)
+	client, err := kubevirtcommon.NewKubevirtClient(b.config.KubeConfig)
 	if err != nil {
-		return nil, warnings, fmt.Errorf("failed to load kube_config %q: %w", b.config.KubeConfig, err)
-	}
-
-	// The KubeVirt client also implements kubernetes.Interface, so it is used
-	// for the core Kubernetes resources as well.
-	client, err := kubecli.GetKubevirtClientFromRESTConfig(restConfig)
-	if err != nil {
-		return nil, warnings, fmt.Errorf("failed to create the KubeVirt client: %w", err)
+		return nil, warnings, err
 	}
 	b.client = client
 
@@ -61,8 +52,8 @@ func (b *Builder) Run(ctx context.Context, ui packer.Ui, hook packer.Hook) (pack
 
 	steps := []multistep.Step{}
 	if !b.config.SkipCreateImage {
-		steps = append(steps, &StepPreValidate{
-			Config: b.config,
+		steps = append(steps, &kubevirtcommon.StepPreValidate{
+			Config: b.config.BuilderConfig,
 			Client: b.client,
 		})
 	}
@@ -71,8 +62,8 @@ func (b *Builder) Run(ctx context.Context, ui packer.Ui, hook packer.Hook) (pack
 			Config: b.config,
 			Client: b.client,
 		},
-		&StepCopyMediaFiles{
-			Config: b.config,
+		&kubevirtcommon.StepCopyMediaFiles{
+			Config: b.config.BuilderConfig,
 			Client: b.client,
 		},
 		&StepCreateVirtualMachine{
@@ -88,17 +79,17 @@ func (b *Builder) Run(ctx context.Context, ui packer.Ui, hook packer.Hook) (pack
 		},
 	)
 
-	steps = append(steps, b.provisionSteps()...)
+	steps = append(steps, kubevirtcommon.ProvisionSteps(b.config.BuilderConfig, b.client, b.config.Comm)...)
 	steps = append(steps,
-		&StepStopVirtualMachine{
-			Config: b.config,
+		&kubevirtcommon.StepStopVirtualMachine{
+			Config: b.config.BuilderConfig,
 			Client: b.client,
 		},
 	)
 
 	if !b.config.SkipCreateImage {
-		steps = append(steps, &StepCreateBootableVolume{
-			Config:        b.config,
+		steps = append(steps, &kubevirtcommon.StepCreateBootableVolume{
+			Config:        b.config.BuilderConfig,
 			Client:        b.client,
 			GeneratedData: generatedData,
 		})
@@ -107,72 +98,5 @@ func (b *Builder) Run(ctx context.Context, ui packer.Ui, hook packer.Hook) (pack
 	b.runner = commonsteps.NewRunner(steps, b.config.PackerConfig, ui)
 	b.runner.Run(ctx, state)
 
-	if rawErr, ok := state.GetOk("error"); ok {
-		return nil, rawErr.(error)
-	}
-	// Steps interrupted by a cancellation halt without recording an error, and
-	// the runner may not have marked the state as cancelled yet.
-	if err := ctx.Err(); err != nil {
-		return nil, fmt.Errorf("build was cancelled: %w", err)
-	}
-	if _, ok := state.GetOk(multistep.StateCancelled); ok {
-		return nil, errors.New("build was cancelled")
-	}
-	if _, ok := state.GetOk(multistep.StateHalted); ok {
-		return nil, errors.New("build was halted")
-	}
-
-	if b.config.SkipCreateImage {
-		return nil, nil
-	}
-
-	bootableVolumeName, ok := state.Get("bootable_volume_name").(string)
-	if !ok || bootableVolumeName == "" {
-		return nil, fmt.Errorf("bootable volume name not found in state")
-	}
-	namespace, _ := state.Get("bootable_volume_namespace").(string)
-
-	return &Artifact{
-		Name:      bootableVolumeName,
-		Namespace: namespace,
-		StateData: map[string]any{
-			"generated_data": state.Get("generated_data"),
-		},
-	}, nil
-}
-
-// provisionSteps returns the steps that connect the communicator to the VM and
-// run the provisioners.
-func (b *Builder) provisionSteps() []multistep.Step {
-	var steps []multistep.Step
-
-	// The VM is only reachable through a port forward, so the communicator
-	// connects with a copy of its configuration that StepStartPortForward
-	// points at the local end of the tunnel.
-	connComm := b.config.Comm
-	if connComm.Type == "ssh" || connComm.Type == "winrm" {
-		steps = append(steps, &StepStartPortForward{
-			Config:        b.config,
-			Client:        b.client,
-			ForwarderFunc: DefaultPortForwarder,
-			Comm:          &connComm,
-		})
-	}
-
-	return append(steps,
-		&communicator.StepConnect{
-			Config: &connComm,
-			Host: func(multistep.StateBag) (string, error) {
-				return connComm.Host(), nil
-			},
-			SSHConfig: connComm.SSHConfigFunc(),
-			SSHPort: func(multistep.StateBag) (int, error) {
-				return connComm.Port(), nil
-			},
-			WinRMPort: func(multistep.StateBag) (int, error) {
-				return connComm.Port(), nil
-			},
-		},
-		&commonsteps.StepProvision{},
-	)
+	return kubevirtcommon.RunResult(ctx, state, BuilderID, b.config.SkipCreateImage)
 }

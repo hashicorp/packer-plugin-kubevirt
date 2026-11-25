@@ -14,6 +14,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 
+	kubevirtcommon "github.com/hashicorp/packer-plugin-kubevirt/builder/kubevirt/common"
 	"github.com/hashicorp/packer-plugin-sdk/multistep"
 	"github.com/hashicorp/packer-plugin-sdk/packer"
 
@@ -78,7 +79,7 @@ func TestStepBootCommandSkipsVNCWithoutBootCommand(t *testing.T) {
 	// No expectations: any call to the client fails the test.
 	client := kubecli.NewMockKubevirtClient(gomock.NewController(t))
 	step := &StepBootCommand{
-		config: Config{Name: "vm", Namespace: "ns", BootWait: time.Hour},
+		config: Config{BuilderConfig: kubevirtcommon.BuilderConfig{Name: "vm", Namespace: "ns"}, BootWait: time.Hour},
 		client: client,
 	}
 
@@ -101,7 +102,7 @@ func TestStepBootCommandTypesAndClosesTheVNCConnection(t *testing.T) {
 	client.EXPECT().VirtualMachineInstance("ns").Return(vmis)
 
 	step := &StepBootCommand{
-		config: Config{Name: "vm", Namespace: "ns", BootCommand: []string{"a"}},
+		config: Config{BuilderConfig: kubevirtcommon.BuilderConfig{Name: "vm", Namespace: "ns"}, BootCommand: []string{"a"}},
 		client: client,
 	}
 
@@ -146,7 +147,7 @@ func TestStepBootCommandClosesTheVNCConnectionWhenTheHandshakeFails(t *testing.T
 	client.EXPECT().VirtualMachineInstance("ns").Return(vmis)
 
 	step := &StepBootCommand{
-		config: Config{Name: "vm", Namespace: "ns", BootCommand: []string{"a"}},
+		config: Config{BuilderConfig: kubevirtcommon.BuilderConfig{Name: "vm", Namespace: "ns"}, BootCommand: []string{"a"}},
 		client: client,
 	}
 

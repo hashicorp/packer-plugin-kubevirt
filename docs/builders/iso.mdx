@@ -49,17 +49,21 @@ build {
 
 ### Required Configuration
 
+@include 'builder/kubevirt/common/BuilderConfig-required.mdx'
+
 @include 'builder/kubevirt/iso/Config-required.mdx'
 
 ### Not Required Configuration
+
+@include 'builder/kubevirt/common/BuilderConfig-not-required.mdx'
 
 @include 'builder/kubevirt/iso/Config-not-required.mdx'
 
 ### Storage Configuration
 
-@include 'builder/kubevirt/iso/StorageConfig.mdx'
+@include 'builder/kubevirt/common/StorageConfig.mdx'
 
-@include 'builder/kubevirt/iso/StorageConfig-not-required.mdx'
+@include 'builder/kubevirt/common/StorageConfig-not-required.mdx'
 
 ### Network Configuration
 
@@ -85,9 +89,9 @@ The `ssh_bastion_*` and `ssh_proxy_*` options are not supported: the
 communicator connects to a port forward on the machine running Packer, which a
 bastion host or a proxy cannot reach.
 
-@include 'builder/kubevirt/iso/PortForwardConfig.mdx'
+@include 'builder/kubevirt/common/PortForwardConfig.mdx'
 
-@include 'builder/kubevirt/iso/PortForwardConfig-not-required.mdx'
+@include 'builder/kubevirt/common/PortForwardConfig-not-required.mdx'
 
 #### Optional common fields:
 

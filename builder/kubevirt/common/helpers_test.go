@@ -1,7 +1,7 @@
 // Copyright (c) Red Hat, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
-package iso_test
+package common_test
 
 import (
 	"context"
@@ -11,13 +11,13 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/hashicorp/packer-plugin-kubevirt/builder/kubevirt/common"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	fakecdiclient "kubevirt.io/client-go/containerizeddataimporter/fake"
 	"kubevirt.io/client-go/kubecli"
 	cdiv1beta1 "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
-
-	"github.com/hashicorp/packer-plugin-kubevirt/builder/kubevirt/iso"
 )
 
 var _ = Describe("WaitUntilDataVolumeSucceeded", func() {
@@ -63,12 +63,12 @@ var _ = Describe("WaitUntilDataVolumeSucceeded", func() {
 		}, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
-		err = iso.WaitUntilDataVolumeSucceeded(ctx, virtClient, namespace, name)
+		err = common.WaitUntilDataVolumeSucceeded(ctx, virtClient, namespace, name)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
 	It("returns error when DataVolume Get fails", func() {
-		err := iso.WaitUntilDataVolumeSucceeded(ctx, virtClient, namespace, "nonexistent-dv")
+		err := common.WaitUntilDataVolumeSucceeded(ctx, virtClient, namespace, "nonexistent-dv")
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("not found"))
 	})
@@ -88,7 +88,7 @@ var _ = Describe("WaitUntilDataVolumeSucceeded", func() {
 		// Cancel quickly so poller doesn't succeed
 		cancel()
 
-		err = iso.WaitUntilDataVolumeSucceeded(ctx, virtClient, namespace, name)
+		err = common.WaitUntilDataVolumeSucceeded(ctx, virtClient, namespace, name)
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("context canceled"))
 	})

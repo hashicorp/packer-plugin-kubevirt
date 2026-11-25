@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/hashicorp/packer-plugin-kubevirt/builder/kubevirt/clone"
 	"github.com/hashicorp/packer-plugin-kubevirt/builder/kubevirt/iso"
 	"github.com/hashicorp/packer-plugin-kubevirt/version"
 	"github.com/hashicorp/packer-plugin-sdk/plugin"
@@ -15,6 +16,7 @@ import (
 func main() {
 	setup := plugin.NewSet()
 	setup.RegisterBuilder("iso", new(iso.Builder))
+	setup.RegisterBuilder("clone", new(clone.Builder))
 	setup.SetVersion(version.PluginVersion)
 
 	if err := setup.Run(); err != nil {

@@ -1,7 +1,7 @@
 // Copyright (c) Red Hat, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
-package iso
+package common
 
 import (
 	"fmt"
@@ -10,6 +10,8 @@ import (
 )
 
 type Artifact struct {
+	// BuilderIDValue identifies which builder produced this artifact.
+	BuilderIDValue string
 	// Name is the DataSource name of the bootable volume.
 	Name string
 	// Namespace is the Kubernetes namespace the DataSource lives in.
@@ -20,7 +22,7 @@ type Artifact struct {
 }
 
 func (a *Artifact) BuilderId() string {
-	return "packer.kubevirt.iso"
+	return a.BuilderIDValue
 }
 
 func (a *Artifact) Files() []string {
