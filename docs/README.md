@@ -16,7 +16,7 @@ packer {
   required_plugins {
     kubevirt = {
       source  = "github.com/hashicorp/kubevirt"
-      version = ">= 1.0.1"
+      version = ">= 1.1.0"
     }
   }
 }

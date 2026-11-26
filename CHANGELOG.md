@@ -1,3 +1,13 @@
+## 1.1.0 (November 26, 2026)
+
+### **FEATURES:**
+* Add the `kubevirt-clone` builder to customize existing bootable volumes
+  [GH-72](https://github.com/hashicorp/packer-plugin-kubevirt/pull/72)
+
+### **IMPROVEMENTS:**
+* `source_volume_namespace` defaults to the build namespace
+  [GH-75](https://github.com/hashicorp/packer-plugin-kubevirt/pull/75)
+
 ## 1.0.1 (November 2, 2026)
 
 ### **SECURITY:**
