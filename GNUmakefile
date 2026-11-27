@@ -34,6 +34,12 @@ PACKER_ACC_WINDOWS_ACCEPT_EULA?=false
 testacc: dev
 	@PACKER_ACC=1 KUBECONFIG=$(KUBECONFIG) PACKER_ACC_WINDOWS_ACCEPT_EULA=$(PACKER_ACC_WINDOWS_ACCEPT_EULA) go test -count $(COUNT) -v $(TEST) $(TEST_ARGS) -timeout=120m
 
+cluster-up:
+	hack/e2e-setup.sh
+
+cluster-down:
+	hack/e2e-setup.sh --install-kind --install-kubectl --cleanup
+
 # The SDK documentation of the SSH communicator is copied without the bastion
 # and proxy options, which cannot reach the port forward of the builder.
 generate: install-packer-sdc

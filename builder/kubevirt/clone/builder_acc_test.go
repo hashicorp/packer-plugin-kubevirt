@@ -115,14 +115,18 @@ func runCloneAccTest(t *testing.T, testName, namespace, template, sourceDVName, 
 	client := kubevirttest.KubevirtClient(t)
 
 	t.Cleanup(func() {
+		kubevirttest.DumpNamespaceOnFailure(t, client, namespace)
 		kubevirttest.CleanupBootableVolume(client, namespace, cloneName)
 		kubevirttest.CleanupDataVolume(client, namespace, sourceDVName)
 		kubevirttest.CleanupNamespace(client, namespace)
 	})
 
 	testCase := &acctest.PluginTestCase{
-		Name:     testName,
-		Template: template,
+		// Keep the resources of a failed build so that DumpNamespaceOnFailure can
+		// collect them; t.Cleanup deletes the namespace afterwards anyway.
+		BuildExtraArgs: []string{"-on-error=abort"},
+		Name:           testName,
+		Template:       template,
 		Setup: func() error {
 			ctx := context.Background()
 			if err := kubevirttest.EnsureNamespace(ctx, client, namespace); err != nil {

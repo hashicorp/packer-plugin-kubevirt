@@ -29,6 +29,7 @@ require (
 	kubevirt.io/api v1.4.0
 	kubevirt.io/client-go v1.4.0
 	kubevirt.io/containerized-data-importer-api v1.60.3
+	sigs.k8s.io/yaml v1.4.0
 )
 
 require (
@@ -214,7 +215,6 @@ require (
 	kubevirt.io/controller-lifecycle-operator-sdk/api v0.0.0-20220329064328-f3cc58c6ed90 // indirect
 	sigs.k8s.io/json v0.0.0-20241010143419-9aa6b5e7a4b3 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.2 // indirect
-	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
 replace github.com/zclconf/go-cty => github.com/nywilken/go-cty v1.13.3 // added by packer-sdc fix as noted in github.com/hashicorp/packer-plugin-sdk/issues/187
