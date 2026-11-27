@@ -202,4 +202,15 @@ var _ = Describe("ISO config", func() {
 			}, "network \"default\": names must be unique"),
 		)
 	})
+
+	Context("Prepare labels", func() {
+		It("decodes the labels", func() {
+			var c iso.Config
+			_, err := c.Prepare(validRawConfig(map[string]interface{}{
+				"labels": map[string]string{"team": "infra", "example.com/os": "fedora"},
+			}))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(c.Labels).To(Equal(map[string]string{"team": "infra", "example.com/os": "fedora"}))
+		})
+	})
 })

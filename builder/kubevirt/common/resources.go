@@ -4,6 +4,7 @@
 package common
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -46,14 +47,15 @@ func PersistentVolumeClaimSpec(diskSize, storageClassName, accessMode, volumeMod
 	return spec
 }
 
-func cloneVolume(name, namespace, diskSize, storageClassName, accessMode, volumeMode string) *cdiv1.DataVolume {
+func cloneVolume(name, namespace, diskSize, storageClassName, accessMode, volumeMode string, labels map[string]string) *cdiv1.DataVolume {
 	return &cdiv1.DataVolume{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: cdiv1.CDIGroupVersionKind.GroupVersion().String(),
 			Kind:       "DataVolume",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
+			Name:   name,
+			Labels: maps.Clone(labels),
 			Annotations: map[string]string{
 				ImmediateBindingAnnotation: "true",
 			},
@@ -70,17 +72,19 @@ func cloneVolume(name, namespace, diskSize, storageClassName, accessMode, volume
 	}
 }
 
-func sourceVolume(name, namespace, instanceType, instanceTypeKind, preferenceName, preferenceKind string) *cdiv1.DataSource {
-	labels := map[string]string{
-		instancetypeapi.DefaultInstancetypeLabel: instanceType,
-		instancetypeapi.DefaultPreferenceLabel:   preferenceName,
+func sourceVolume(name, namespace, instanceType, instanceTypeKind, preferenceName, preferenceKind string, labels map[string]string) *cdiv1.DataSource {
+	dsLabels := maps.Clone(labels)
+	if dsLabels == nil {
+		dsLabels = make(map[string]string)
 	}
+	dsLabels[instancetypeapi.DefaultInstancetypeLabel] = instanceType
+	dsLabels[instancetypeapi.DefaultPreferenceLabel] = preferenceName
 
 	if instanceTypeKind != "" && !IsSupportedKind(instanceTypeKind, instancetypeapi.ClusterSingularResourceName) {
-		labels[instancetypeapi.DefaultInstancetypeKindLabel] = instanceTypeKind
+		dsLabels[instancetypeapi.DefaultInstancetypeKindLabel] = instanceTypeKind
 	}
 	if preferenceKind != "" && !IsSupportedKind(preferenceKind, instancetypeapi.ClusterSingularPreferenceResourceName) {
-		labels[instancetypeapi.DefaultPreferenceKindLabel] = preferenceKind
+		dsLabels[instancetypeapi.DefaultPreferenceKindLabel] = preferenceKind
 	}
 
 	return &cdiv1.DataSource{
@@ -90,7 +94,7 @@ func sourceVolume(name, namespace, instanceType, instanceTypeKind, preferenceNam
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   name,
-			Labels: labels,
+			Labels: dsLabels,
 		},
 		Spec: cdiv1.DataSourceSpec{
 			Source: cdiv1.DataSourceSource{

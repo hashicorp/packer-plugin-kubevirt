@@ -27,8 +27,8 @@ func (s *StepCreateBootableVolume) Run(ctx context.Context, state multistep.Stat
 	name := s.Config.Name
 	namespace := s.Config.Namespace
 
-	cloneVolume := cloneVolume(name, namespace, s.Config.DiskSize, s.Config.StorageClassName, s.Config.AccessMode, s.Config.VolumeMode)
-	sourceVolume := sourceVolume(name, namespace, s.Config.InstanceType, s.Config.InstanceTypeKind, s.Config.Preference, s.Config.PreferenceKind)
+	cloneVolume := cloneVolume(name, namespace, s.Config.DiskSize, s.Config.StorageClassName, s.Config.AccessMode, s.Config.VolumeMode, s.Config.Labels)
+	sourceVolume := sourceVolume(name, namespace, s.Config.InstanceType, s.Config.InstanceTypeKind, s.Config.Preference, s.Config.PreferenceKind, s.Config.Labels)
 
 	ui.Sayf("Creating a new bootable volume (%s/%s)...", namespace, name)
 

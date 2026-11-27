@@ -47,6 +47,11 @@ source "kubevirt-clone" "fedora-customized" {
   instance_type = "o1.medium"
   preference    = "fedora"
 
+  # Labels of the resulting DataVolume and DataSource
+  labels = {
+    "app.kubernetes.io/part-of" = "packer-images"
+  }
+
   networks {
     name = "default"
 

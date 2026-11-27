@@ -22,6 +22,7 @@ type FlatBuilderConfig struct {
 	MediaFiles                []string          `mapstructure:"media_files" required:"false" cty:"media_files" hcl:"media_files"`
 	MediaContent              map[string]string `mapstructure:"media_content" required:"false" cty:"media_content" hcl:"media_content"`
 	MediaLabel                *string           `mapstructure:"media_label" required:"false" cty:"media_label" hcl:"media_label"`
+	Labels                    map[string]string `mapstructure:"labels" required:"false" cty:"labels" hcl:"labels"`
 	StorageClassName          *string           `mapstructure:"storage_class_name" required:"false" cty:"storage_class_name" hcl:"storage_class_name"`
 	AccessMode                *string           `mapstructure:"access_mode" required:"false" cty:"access_mode" hcl:"access_mode"`
 	VolumeMode                *string           `mapstructure:"volume_mode" required:"false" cty:"volume_mode" hcl:"volume_mode"`
@@ -106,6 +107,7 @@ func (*FlatBuilderConfig) HCL2Spec() map[string]hcldec.Spec {
 		"media_files":                  &hcldec.AttrSpec{Name: "media_files", Type: cty.List(cty.String), Required: false},
 		"media_content":                &hcldec.AttrSpec{Name: "media_content", Type: cty.Map(cty.String), Required: false},
 		"media_label":                  &hcldec.AttrSpec{Name: "media_label", Type: cty.String, Required: false},
+		"labels":                       &hcldec.AttrSpec{Name: "labels", Type: cty.Map(cty.String), Required: false},
 		"storage_class_name":           &hcldec.AttrSpec{Name: "storage_class_name", Type: cty.String, Required: false},
 		"access_mode":                  &hcldec.AttrSpec{Name: "access_mode", Type: cty.String, Required: false},
 		"volume_mode":                  &hcldec.AttrSpec{Name: "volume_mode", Type: cty.String, Required: false},

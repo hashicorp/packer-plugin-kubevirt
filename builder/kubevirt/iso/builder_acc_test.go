@@ -64,6 +64,10 @@ source "kubevirt-iso" "fedora" {
   preference    = "{{ .Preference }}"
   os_type       = "linux"
 
+  labels = {
+    "packer.io/acceptance-test" = "true"
+  }
+
   media_content = {
   {{- range $name, $content := .MediaContent }}
     "{{ $name }}" = <<-EOF
@@ -109,6 +113,10 @@ source "kubevirt-iso" "ubuntu" {
   instance_type = "{{ .InstanceType }}"
   preference    = "{{ .Preference }}"
   os_type       = "linux"
+
+  labels = {
+    "packer.io/acceptance-test" = "true"
+  }
 
   media_content = {
   {{- range $name, $content := .MediaContent }}
@@ -156,6 +164,10 @@ source "kubevirt-iso" "windows" {
   instance_type = "{{ .InstanceType }}"
   preference    = "{{ .Preference }}"
   os_type       = "windows"
+
+  labels = {
+    "packer.io/acceptance-test" = "true"
+  }
 
   media_content = {
   {{- range $name, $content := .MediaContent }}
@@ -318,9 +330,15 @@ func runISOAccTest(t *testing.T, name, namespace, template, isoName, isoURL, iso
 			if err := kubevirttest.CheckDataVolume(client, namespace, imageName); err != nil {
 				return err
 			}
+			if err := kubevirttest.CheckDataVolumeLabels(client, namespace, imageName, map[string]string{
+				"packer.io/acceptance-test": "true",
+			}); err != nil {
+				return err
+			}
 			if err := kubevirttest.CheckDataSourceLabels(client, namespace, imageName, map[string]string{
 				"instancetype.kubevirt.io/default-instancetype": instanceType,
 				"instancetype.kubevirt.io/default-preference":   preference,
+				"packer.io/acceptance-test":                     "true",
 			}); err != nil {
 				return err
 			}

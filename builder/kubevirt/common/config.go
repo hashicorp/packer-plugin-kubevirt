@@ -98,6 +98,20 @@ type BuilderConfig struct {
 	// NoCloud / Subiquity autoinstall (Ubuntu). Only applies to Linux operating systems.
 	// Must be at most 32 characters long. Defaults to "OEMDRV".
 	MediaLabel string `mapstructure:"media_label" required:"false"`
+	// Labels are Kubernetes labels applied to the image the builder produces: the
+	// bootable DataVolume and the DataSource. They are not applied to the
+	// temporary resources. Keys and values must be valid Kubernetes labels.
+	// The instance type and preference labels of the DataSource are set from
+	// `instance_type`, `instance_type_kind`, `preference` and `preference_kind`,
+	// and cannot be set here.
+	//
+	// ```hcl
+	// labels = {
+	//   "app.kubernetes.io/part-of" = "packer"
+	//   label                       = "example"
+	// }
+	// ```
+	Labels map[string]string `mapstructure:"labels" required:"false"`
 
 	StorageConfig     `mapstructure:",squash"`
 	Comm              communicator.Config `mapstructure:",squash"`
@@ -141,6 +155,15 @@ type PortForwardConfig struct {
 	WinRMLocalPort int `mapstructure:"winrm_local_port" required:"false"`
 }
 
+// builderLabels are set on the DataSource from the instance type and preference
+// options, so that KubeVirt infers them for the VMs created from the image.
+var builderLabels = map[string]bool{
+	instancetypeapi.DefaultInstancetypeLabel:     true,
+	instancetypeapi.DefaultInstancetypeKindLabel: true,
+	instancetypeapi.DefaultPreferenceLabel:       true,
+	instancetypeapi.DefaultPreferenceKindLabel:   true,
+}
+
 // Validate checks the common configuration fields shared by all KubeVirt
 // builders. Each builder calls this from its own Prepare method after setting
 // builder-specific defaults (e.g. communicator type).
@@ -154,7 +177,28 @@ func (c *BuilderConfig) Validate(ctx *interpolate.Context) []error {
 	errs = append(errs, c.validateMedia()...)
 	errs = append(errs, c.validateStorage()...)
 	errs = append(errs, c.validatePreferencesAndInstanceTypes()...)
+	errs = append(errs, c.validateLabels()...)
 	errs = append(errs, c.validateCommunicator(ctx)...)
+
+	return errs
+}
+
+func (c *BuilderConfig) validateLabels() []error {
+	var errs []error
+
+	for _, key := range slices.Sorted(maps.Keys(c.Labels)) {
+		if builderLabels[key] {
+			errs = append(errs, fmt.Errorf("labels: %q is set by the builder, use instance_type, instance_type_kind, preference or preference_kind instead", key))
+			continue
+		}
+		for _, msg := range validation.IsQualifiedName(key) {
+			errs = append(errs, fmt.Errorf("labels: key %q is invalid: %s", key, msg))
+		}
+		value := c.Labels[key]
+		for _, msg := range validation.IsValidLabelValue(value) {
+			errs = append(errs, fmt.Errorf("labels: value %q of %q is invalid: %s", value, key, msg))
+		}
+	}
 
 	return errs
 }

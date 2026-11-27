@@ -125,4 +125,15 @@ var _ = Describe("Config", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
+
+	Context("Prepare labels", func() {
+		It("decodes the labels", func() {
+			var c clone.Config
+			_, err := c.Prepare(validRawConfig(map[string]interface{}{
+				"labels": map[string]string{"team": "infra", "example.com/os": "fedora"},
+			}))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(c.Labels).To(Equal(map[string]string{"team": "infra", "example.com/os": "fedora"}))
+		})
+	})
 })
