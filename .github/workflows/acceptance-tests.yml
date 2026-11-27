@@ -75,6 +75,7 @@ jobs:
           name: packer-logs-${{ matrix.test.name }}
           path: |
             builder/**/packer_log_*.txt
+            builder/**/cluster_state_*.txt
             builder/**/*.pkr.hcl
           if-no-files-found: ignore
 

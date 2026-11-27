@@ -313,14 +313,18 @@ func runISOAccTest(t *testing.T, name, namespace, template, isoName, isoURL, iso
 	client := kubevirttest.KubevirtClient(t)
 
 	t.Cleanup(func() {
+		kubevirttest.DumpNamespaceOnFailure(t, client, namespace)
 		kubevirttest.CleanupBootableVolume(client, namespace, imageName)
 		kubevirttest.CleanupDataVolume(client, namespace, isoName)
 		kubevirttest.CleanupNamespace(client, namespace)
 	})
 
 	testCase := &acctest.PluginTestCase{
-		Name:     name,
-		Template: template,
+		// Keep the resources of a failed build so that DumpNamespaceOnFailure can
+		// collect them; t.Cleanup deletes the namespace afterwards anyway.
+		BuildExtraArgs: []string{"-on-error=abort"},
+		Name:           name,
+		Template:       template,
 		Setup: func() error {
 			ctx := context.Background()
 			if err := kubevirttest.EnsureNamespace(ctx, client, namespace); err != nil {

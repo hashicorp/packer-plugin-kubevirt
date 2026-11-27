@@ -1,6 +1,7 @@
 main
 packer-plugin-kubevirt
 **/packer_log*.txt
+**/cluster_state_*.txt
 **/git_*test.pkr.hcl
 crash.log
 temp/

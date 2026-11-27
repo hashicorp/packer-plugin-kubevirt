@@ -6,7 +6,10 @@ package testing
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
+	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -19,7 +22,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/yaml"
 
+	kubevirtv1 "kubevirt.io/api/core/v1"
 	"kubevirt.io/client-go/kubecli"
 	cdiv1 "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 )
@@ -219,4 +224,168 @@ func ReadTestData(t *testing.T, name string) string {
 
 func RandomNamespace(prefix string) string {
 	return fmt.Sprintf("%s%s", prefix, k8srand.String(5))
+}
+
+const (
+	// clusterStateTimeout bounds how long dumping the cluster state may take,
+	// so that an unhealthy cluster cannot hang the test cleanup.
+	clusterStateTimeout = 2 * time.Minute
+	// podLogTailLines is the number of log lines collected per container.
+	podLogTailLines = 500
+)
+
+// DumpNamespaceOnFailure writes the state of the KubeVirt and CDI resources in
+// the namespace, the logs of its pods and its events to a file in the test's
+// working directory, if the test failed. Call it in t.Cleanup before deleting
+// any resource, so that the state is collected before it is gone.
+func DumpNamespaceOnFailure(t *testing.T, client kubecli.KubevirtClient, namespace string) {
+	t.Helper()
+	if !t.Failed() {
+		return
+	}
+
+	path := "cluster_state_" + strings.ReplaceAll(t.Name(), "/", "_") + ".txt"
+	file, err := os.Create(path)
+	if err != nil {
+		t.Logf("failed to create %s: %v", path, err)
+		return
+	}
+	defer file.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), clusterStateTimeout)
+	defer cancel()
+	dumpNamespace(ctx, file, client, namespace)
+	t.Logf("state of namespace %s written to %s", namespace, path)
+}
+
+func dumpNamespace(ctx context.Context, w io.Writer, client kubecli.KubevirtClient, namespace string) {
+	listOptions := metav1.ListOptions{}
+
+	dumpObjects(w, "VirtualMachines", func() ([]kubevirtv1.VirtualMachine, error) {
+		list, err := client.VirtualMachine(namespace).List(ctx, listOptions)
+		if err != nil {
+			return nil, err
+		}
+		return list.Items, nil
+	})
+	dumpObjects(w, "VirtualMachineInstances", func() ([]kubevirtv1.VirtualMachineInstance, error) {
+		list, err := client.VirtualMachineInstance(namespace).List(ctx, listOptions)
+		if err != nil {
+			return nil, err
+		}
+		return list.Items, nil
+	})
+	dumpObjects(w, "DataVolumes", func() ([]cdiv1.DataVolume, error) {
+		list, err := client.CdiClient().CdiV1beta1().DataVolumes(namespace).List(ctx, listOptions)
+		if err != nil {
+			return nil, err
+		}
+		return list.Items, nil
+	})
+	dumpObjects(w, "PersistentVolumeClaims", func() ([]corev1.PersistentVolumeClaim, error) {
+		list, err := client.CoreV1().PersistentVolumeClaims(namespace).List(ctx, listOptions)
+		if err != nil {
+			return nil, err
+		}
+		return list.Items, nil
+	})
+	pods := dumpObjects(w, "Pods", func() ([]corev1.Pod, error) {
+		list, err := client.CoreV1().Pods(namespace).List(ctx, listOptions)
+		if err != nil {
+			return nil, err
+		}
+		return list.Items, nil
+	})
+	dumpPodLogs(ctx, w, client, pods)
+	dumpEvents(ctx, w, client, namespace)
+}
+
+// dumpObjects writes the objects returned by list as YAML, and returns them.
+func dumpObjects[T any, PT interface {
+	*T
+	metav1.Object
+}](
+	w io.Writer,
+	title string,
+	list func() ([]T, error)) []T {
+	writeSection(w, title)
+	items, err := list()
+	if err != nil {
+		dumpf(w, "failed to list %s: %v\n", title, err)
+		return nil
+	}
+	for i := range items {
+		obj := PT(&items[i])
+		obj.SetManagedFields(nil)
+		dumpf(w, "--- %s ---\n", obj.GetName())
+		data, err := yaml.Marshal(obj)
+		if err != nil {
+			dumpf(w, "failed to marshal %s: %v\n", obj.GetName(), err)
+			continue
+		}
+		_, _ = w.Write(data)
+	}
+	return items
+}
+
+// dumpPodLogs writes the last log lines of every container of the pods. For
+// virt-launcher pods this includes the guest serial console log.
+func dumpPodLogs(ctx context.Context, w io.Writer, client kubecli.KubevirtClient, pods []corev1.Pod) {
+	writeSection(w, "Pod logs")
+	for _, pod := range pods {
+		containers := append(append([]corev1.Container{}, pod.Spec.InitContainers...), pod.Spec.Containers...)
+		for _, container := range containers {
+			dumpf(w, "--- %s/%s ---\n", pod.Name, container.Name)
+			logs, err := client.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, &corev1.PodLogOptions{
+				Container: container.Name,
+				TailLines: ptr.To[int64](podLogTailLines),
+			}).DoRaw(ctx)
+			if err != nil {
+				dumpf(w, "failed to get logs: %v\n", err)
+				continue
+			}
+			_, _ = w.Write(logs)
+		}
+	}
+}
+
+// dumpEvents writes the events of the namespace in chronological order.
+func dumpEvents(ctx context.Context, w io.Writer, client kubecli.KubevirtClient, namespace string) {
+	writeSection(w, "Events")
+	list, err := client.CoreV1().Events(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		dumpf(w, "failed to list events: %v\n", err)
+		return
+	}
+	events := list.Items
+	sort.SliceStable(events, func(i, j int) bool {
+		return eventTime(events[i]).Before(eventTime(events[j]))
+	})
+	for _, event := range events {
+		dumpf(w, "%s %s %s %s/%s: %s\n",
+			eventTime(event).UTC().Format(time.RFC3339), event.Type, event.Reason,
+			event.InvolvedObject.Kind, event.InvolvedObject.Name, event.Message)
+	}
+}
+
+// eventTime returns the last time the event was observed. Depending on the
+// API used to record it, an event sets either LastTimestamp or EventTime.
+func eventTime(event corev1.Event) time.Time {
+	if !event.LastTimestamp.IsZero() {
+		return event.LastTimestamp.Time
+	}
+	if !event.EventTime.IsZero() {
+		return event.EventTime.Time
+	}
+	return event.CreationTimestamp.Time
+}
+
+func writeSection(w io.Writer, title string) {
+	dumpf(w, "\n=== %s ===\n", title)
+}
+
+// dumpf writes to the cluster state dump. Write errors are ignored because
+// collecting the state is best-effort and must never fail the test.
+func dumpf(w io.Writer, format string, args ...any) {
+	_, _ = fmt.Fprintf(w, format, args...)
 }
